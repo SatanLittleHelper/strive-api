@@ -1,0 +1,13 @@
+.DS_Store
+bin/
+dist/
+coverage/
+*.log
+*.out
+*.test
+tmp/
+vendor/
+.idea/
+.vscode/
+
+
