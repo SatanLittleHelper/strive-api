@@ -1,4 +1,4 @@
-.PHONY: run run-dev test lint format clean build
+.PHONY: run run-dev test lint format clean build db-up db-down db-reset
 
 run:
 	go run ./cmd/server
@@ -16,6 +16,19 @@ run-dev:
 	DB_SSL_MODE=disable \
 	JWT_SECRET=dev-secret-key-12345 \
 	go run ./cmd/server
+
+db-up:
+	@echo "Starting PostgreSQL database..."
+	docker compose up -d postgres
+
+db-down:
+	@echo "Stopping PostgreSQL database..."
+	docker compose down
+
+db-reset:
+	@echo "Resetting PostgreSQL database..."
+	docker compose down -v
+	docker compose up -d postgres
 
 test:
 	go test ./... -count=1 -race -timeout=60s
