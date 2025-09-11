@@ -11,7 +11,30 @@ import (
 	"github.com/aleksandr/strive-api/internal/migrate"
 	"github.com/aleksandr/strive-api/internal/repositories"
 	"github.com/aleksandr/strive-api/internal/services"
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "github.com/aleksandr/strive-api/docs"
 )
+
+// @title Strive API
+// @version 1.0
+// @description API for workout diary with user authentication
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:8080
+// @BasePath /
+// @schemes http https
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
 	cfg, err := config.Load()
@@ -45,6 +68,9 @@ func main() {
 	mux.HandleFunc("/health", httphandler.HealthHandler)
 	mux.HandleFunc("/api/v1/auth/register", authHandlers.Register)
 	mux.HandleFunc("/api/v1/auth/login", authHandlers.Login)
+	
+	// Swagger documentation
+	mux.HandleFunc("/swagger/", httpSwagger.WrapHandler)
 
 	// Protected routes (example)
 	protectedMux := http.NewServeMux()

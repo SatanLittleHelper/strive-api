@@ -50,6 +50,23 @@ format:
 	gofumpt -l -w .
 	goimports -w .
 
+docs:
+	@echo "Generating API documentation..."
+	swag init -g cmd/server/main.go
+	@echo "Documentation generated in docs/"
+
+docs-serve:
+	@echo "Serving API documentation..."
+	@echo "Visit http://localhost:8080/swagger/ after starting the server"
+
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t strive-api .
+
+docker-run:
+	@echo "Running Docker container..."
+	docker run -p 8080:8080 strive-api
+
 build:
 	go build -o bin/server ./cmd/server
 

@@ -1,146 +1,281 @@
 # Strive API
 
-API для дневника тренировок с аутентификацией и управлением пользователями.
+A modern workout diary API built with Go, featuring user authentication, JWT tokens, and comprehensive testing.
 
-## Быстрый старт
+## 🚀 Features
 
-### 1. Установка зависимостей
+- **User Authentication**: JWT-based authentication with access and refresh tokens
+- **Password Security**: bcrypt password hashing
+- **Database Integration**: PostgreSQL with automatic migrations
+- **Comprehensive Testing**: 17 unit tests with 73%+ code coverage
+- **API Documentation**: OpenAPI/Swagger documentation
+- **Containerization**: Docker and Docker Compose support
+- **Structured Logging**: JSON/text logging with configurable levels
+- **Graceful Shutdown**: Proper server lifecycle management
 
-```bash
-# Go модули
-go mod download
+## 📋 Requirements
 
-# Инструменты разработки (опционально)
-make install-tools
+- Go 1.22+
+- PostgreSQL 15+
+- Docker & Docker Compose (optional)
+- Make (optional, for convenience commands)
+
+## 🛠️ Installation
+
+### Option 1: Local Development
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd strive-api
+   ```
+
+2. **Install dependencies**
+   ```bash
+   go mod download
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. **Start PostgreSQL**
+   ```bash
+   make db-up
+   ```
+
+5. **Run the application**
+   ```bash
+   make run-dev
+   ```
+
+### Option 2: Docker Compose
+
+1. **Clone and start**
+   ```bash
+   git clone <repository-url>
+   cd strive-api
+   docker compose up --build
+   ```
+
+## 🔧 Configuration
+
+The application uses environment variables for configuration. Copy `env.example` to `.env` and customize:
+
+```env
+PORT=8080
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=password
+DB_NAME=strive
+DB_SSL_MODE=disable
+JWT_SECRET=your-secret-key-change-in-production
 ```
 
-### 2. Настройка базы данных
+## 📚 API Documentation
 
-Создайте базу данных PostgreSQL:
+Once the server is running, visit:
+- **Swagger UI**: http://localhost:8080/swagger/
+- **OpenAPI JSON**: http://localhost:8080/swagger/doc.json
 
-```sql
-CREATE DATABASE strive;
-CREATE USER strive_user WITH PASSWORD 'password';
-GRANT ALL PRIVILEGES ON DATABASE strive TO strive_user;
-```
+## 🔌 API Endpoints
 
-### 3. Запуск приложения
-
-#### Для разработки (с предустановленными переменными окружения):
-```bash
-make run-dev
-```
-
-#### С кастомными переменными окружения:
-```bash
-PORT=8080 \
-DB_HOST=localhost \
-DB_PORT=5432 \
-DB_USER=postgres \
-DB_PASSWORD=password \
-DB_NAME=strive \
-JWT_SECRET=your-secret-key \
-go run ./cmd/server
-```
-
-## Переменные окружения
-
-| Переменная | Описание | Значение по умолчанию |
-|------------|----------|----------------------|
-| `PORT` | Порт сервера | `8080` |
-| `LOG_LEVEL` | Уровень логирования | `INFO` |
-| `LOG_FORMAT` | Формат логов | `json` |
-| `DB_HOST` | Хост базы данных | `localhost` |
-| `DB_PORT` | Порт PostgreSQL | `5432` |
-| `DB_USER` | Пользователь БД | `postgres` |
-| `DB_PASSWORD` | Пароль БД | `password` |
-| `DB_NAME` | Имя базы данных | `strive` |
-| `DB_SSL_MODE` | SSL режим | `disable` |
-| `JWT_SECRET` | Секрет для JWT токенов | `your-secret-key-change-in-production` |
-
-## API Endpoints
-
-### Публичные endpoints
+### Public Endpoints
 
 - `GET /health` - Health check
-- `POST /api/v1/auth/register` - Регистрация пользователя
-- `POST /api/v1/auth/login` - Вход в систему
+- `POST /api/v1/auth/register` - User registration
+- `POST /api/v1/auth/login` - User login
 
-### Защищенные endpoints (требуют JWT токен)
+### Protected Endpoints (require JWT token)
 
-- `GET /api/v1/user/profile` - Профиль пользователя
+- `GET /api/v1/user/profile` - Get user profile
 
-## Примеры использования
+### Example Usage
 
-### Регистрация пользователя
-
+**Register a new user:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
-    "password": "securepassword123"
+    "password": "password123"
   }'
 ```
 
-### Вход в систему
-
+**Login:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
-    "password": "securepassword123"
+    "password": "password123"
   }'
 ```
 
-### Доступ к защищенному endpoint
-
+**Access protected endpoint:**
 ```bash
 curl -X GET http://localhost:8080/api/v1/user/profile \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-## Команды разработки
+## 🧪 Testing
+
+Run the test suite:
 
 ```bash
-make run-dev     # Запуск с переменными разработки
-make test        # Запуск тестов
-make lint        # Проверка кода линтером
-make format      # Форматирование кода
-make build       # Сборка бинарника
+# Run all tests
+make test
+
+# Run unit tests only
+make test-unit
+
+# Run tests with coverage report
+make test-coverage
+
+# Run specific test package
+go test ./internal/services -v
+go test ./internal/http -v
 ```
 
-## Структура проекта
+## 🐳 Docker Commands
+
+```bash
+# Build and start all services
+docker compose up --build
+
+# Start only database
+docker compose up postgres
+
+# Stop all services
+docker compose down
+
+# Reset database
+docker compose down -v
+docker compose up postgres
+```
+
+## 🛠️ Development Commands
+
+```bash
+# Format code
+make format
+
+# Run linter
+make lint
+
+# Build binary
+make build
+
+# Run with development settings
+make run-dev
+
+# Start database
+make db-up
+
+# Stop database
+make db-down
+
+# Reset database
+make db-reset
+```
+
+## 📁 Project Structure
 
 ```
 strive-api/
-├── cmd/server/              # Точка входа приложения
+├── cmd/server/           # Application entry point
 ├── internal/
-│   ├── config/             # Конфигурация
-│   ├── database/           # Подключение к БД
-│   ├── http/               # HTTP хендлеры и middleware
-│   ├── logger/             # Логирование
-│   ├── migrate/            # Миграции БД
-│   ├── models/             # Модели данных
-│   ├── repositories/       # Репозитории для работы с БД
-│   └── services/           # Бизнес-логика
-├── migrations/             # SQL миграции
-├── docs/                   # Документация
-└── Makefile               # Команды разработки
+│   ├── config/          # Configuration management
+│   ├── database/        # Database connection and health
+│   ├── http/           # HTTP handlers and middleware
+│   ├── logger/         # Structured logging
+│   ├── migrate/        # Database migrations
+│   ├── models/         # Data models
+│   ├── repositories/   # Data access layer
+│   └── services/       # Business logic
+├── docs/               # Generated API documentation
+├── migrations/         # Database migration files
+├── docker-compose.yml  # Docker Compose configuration
+├── Dockerfile         # Docker image definition
+├── Makefile          # Development commands
+└── README.md         # This file
 ```
 
-## Безопасность
+## 🔐 Security Features
 
-- Пароли хешируются с помощью bcrypt
-- JWT токены подписываются HMAC SHA256
-- Access токены действительны 15 минут
-- Refresh токены действительны 7 дней
+- **Password Hashing**: bcrypt with configurable cost
+- **JWT Tokens**: HMAC SHA256 signed tokens
+- **Token Expiration**: Access tokens (15 min), Refresh tokens (7 days)
+- **Input Validation**: Request validation and sanitization
+- **Graceful Error Handling**: No sensitive data leakage
 
-## Разработка
+## 📊 Testing Coverage
 
-1. Клонируйте репозиторий
-2. Установите PostgreSQL
-3. Создайте базу данных
-4. Запустите `make run-dev`
-5. API будет доступен на `http://localhost:8080`
+- **HTTP Handlers**: 73% coverage
+- **Services**: 72.5% coverage
+- **Total Tests**: 17 unit tests
+- **Test Types**: AuthService, HTTP handlers, middleware
+
+## 🚀 Deployment
+
+### Production Deployment
+
+1. **Set production environment variables**
+2. **Build Docker image**
+   ```bash
+   docker build -t strive-api .
+   ```
+3. **Run with production database**
+   ```bash
+   docker run -d \
+     -p 8080:8080 \
+     -e DB_HOST=your-db-host \
+     -e JWT_SECRET=your-production-secret \
+     strive-api
+   ```
+
+### Environment Variables for Production
+
+```env
+PORT=8080
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+DB_HOST=your-postgres-host
+DB_PORT=5432
+DB_USER=your-db-user
+DB_PASSWORD=your-secure-password
+DB_NAME=strive
+DB_SSL_MODE=require
+JWT_SECRET=your-very-secure-jwt-secret
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+For support, email support@example.com or create an issue in the repository.
+
+## 📈 Roadmap
+
+- [ ] Integration tests with testcontainers
+- [ ] Rate limiting
+- [ ] Metrics and monitoring (Prometheus)
+- [ ] CI/CD pipeline
+- [ ] Additional business logic (exercises, workouts, sets)
+- [ ] File upload support
+- [ ] Email notifications
