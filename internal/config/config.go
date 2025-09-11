@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Server ServerConfig
 	Log    LogConfig
+	DB     DatabaseConfig
 }
 
 type ServerConfig struct {
@@ -24,6 +25,17 @@ type LogConfig struct {
 	Format string
 }
 
+type DatabaseConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
+	MaxConns int32
+	MinConns int32
+}
+
 func Load() (*Config, error) {
 	config := &Config{
 		Server: ServerConfig{
@@ -35,6 +47,16 @@ func Load() (*Config, error) {
 		Log: LogConfig{
 			Level:  getEnv("LOG_LEVEL", "INFO"),
 			Format: getEnv("LOG_FORMAT", "json"),
+		},
+		DB: DatabaseConfig{
+			Host:     getEnv("DB_HOST", "localhost"),
+			Port:     getEnvInt("DB_PORT", 5432),
+			User:     getEnv("DB_USER", "postgres"),
+			Password: getEnv("DB_PASSWORD", "password"),
+			DBName:   getEnv("DB_NAME", "strive"),
+			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			MaxConns: int32(getEnvInt("DB_MAX_CONNS", 25)),
+			MinConns: int32(getEnvInt("DB_MIN_CONNS", 5)),
 		},
 	}
 
@@ -68,7 +90,24 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid log format: %s", c.Log.Format)
 	}
 
+	if c.DB.Port <= 0 || c.DB.Port > 65535 {
+		return fmt.Errorf("invalid database port: %d", c.DB.Port)
+	}
+
+	if c.DB.MaxConns <= 0 {
+		return fmt.Errorf("invalid max connections: %d", c.DB.MaxConns)
+	}
+
+	if c.DB.MinConns < 0 || c.DB.MinConns > c.DB.MaxConns {
+		return fmt.Errorf("invalid min connections: %d", c.DB.MinConns)
+	}
+
 	return nil
+}
+
+func (c *Config) DatabaseURL() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		c.DB.User, c.DB.Password, c.DB.Host, c.DB.Port, c.DB.DBName, c.DB.SSLMode)
 }
 
 func getEnv(key, defaultValue string) string {
