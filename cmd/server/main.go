@@ -3,35 +3,27 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 
+	"github.com/aleksandr/strive-api/internal/config"
 	httphandler "github.com/aleksandr/strive-api/internal/http"
+	"github.com/aleksandr/strive-api/internal/logger"
 )
 
-func getEnvOrDefault(key string, fallback string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
-	}
-	return value
-}
-
-func parsePort(portStr string) (int, error) {
-	return strconv.Atoi(portStr)
-}
-
 func main() {
-	portStr := getEnvOrDefault("PORT", "8080")
-	port, err := parsePort(portStr)
-	if err != nil || port <= 0 || port > 65535 {
-		log.Fatalf("invalid PORT: %s", portStr)
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	logger := logger.New(cfg.Log.Level, cfg.Log.Format)
+	logger.Info("Application starting", "config", cfg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", httphandler.HealthHandler)
 
-	server := httphandler.NewServer(port, mux)
+	handler := httphandler.LoggingMiddleware(logger)(httphandler.RequestIDMiddleware()(mux))
+
+	server := httphandler.NewServer(cfg, handler, logger)
 	server.Start()
 	server.WaitForShutdown()
 }
