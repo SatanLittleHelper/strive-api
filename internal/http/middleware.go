@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -59,8 +60,9 @@ func RequestIDMiddleware() func(http.Handler) http.Handler {
 				requestID = uuid.New().String()
 			}
 
+			ctx := context.WithValue(r.Context(), "request_id", requestID)
 			w.Header().Set("X-Request-ID", requestID)
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

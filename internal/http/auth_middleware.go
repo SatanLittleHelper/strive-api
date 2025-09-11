@@ -22,9 +22,15 @@ func AuthMiddleware(authService services.AuthService) func(http.Handler) http.Ha
 				return
 			}
 
-			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-			if tokenString == authHeader {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
 				http.Error(w, `{"error":{"code":"INVALID_TOKEN","message":"Bearer token required"}}`, http.StatusUnauthorized)
+				return
+			}
+
+			tokenString := parts[1]
+			if tokenString == "" {
+				http.Error(w, `{"error":{"code":"EMPTY_TOKEN","message":"Token cannot be empty"}}`, http.StatusUnauthorized)
 				return
 			}
 

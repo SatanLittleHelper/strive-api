@@ -33,6 +33,16 @@ db-reset:
 test:
 	go test ./... -count=1 -race -timeout=60s
 
+test-unit:
+	@echo "Running unit tests..."
+	go test ./internal/services ./internal/http -count=1 -race -timeout=60s
+
+test-coverage:
+	@echo "Running tests with coverage..."
+	go test ./... -count=1 -race -timeout=60s -coverprofile=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
 lint:
 	golangci-lint run
 
