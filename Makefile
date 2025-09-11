@@ -1,4 +1,4 @@
-.PHONY: run run-dev test lint format clean build db-up db-down db-reset
+.PHONY: run run-dev test lint format clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs
 
 run:
 	go run ./cmd/server
@@ -66,6 +66,31 @@ docker-build:
 docker-run:
 	@echo "Running Docker container..."
 	docker run -p 8080:8080 strive-api
+
+docker-up:
+	@echo "Starting application with Docker Compose..."
+	docker compose up -d
+
+docker-up-build:
+	@echo "Building and starting application with Docker Compose..."
+	docker compose up --build -d
+
+docker-down:
+	@echo "Stopping Docker Compose services..."
+	docker compose down
+
+docker-restart:
+	@echo "Restarting application with rebuild..."
+	docker compose down
+	docker compose up --build -d
+
+docker-logs:
+	@echo "Showing application logs..."
+	docker compose logs -f app
+
+docker-logs-all:
+	@echo "Showing all logs..."
+	docker compose logs -f
 
 build:
 	go build -o bin/server ./cmd/server

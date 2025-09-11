@@ -7,17 +7,20 @@ import (
 	"github.com/aleksandr/strive-api/internal/logger"
 	"github.com/aleksandr/strive-api/internal/models"
 	"github.com/aleksandr/strive-api/internal/services"
+	"github.com/aleksandr/strive-api/internal/validation"
 )
 
 type AuthHandlers struct {
-	authService services.AuthService
-	logger      *logger.Logger
+	authService    services.AuthService
+	logger         *logger.Logger
+	securityLogger *SecurityLogger
 }
 
 func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *AuthHandlers {
 	return &AuthHandlers{
-		authService: authService,
-		logger:      logger,
+		authService:    authService,
+		logger:         logger,
+		securityLogger: NewSecurityLogger(logger),
 	}
 }
 
@@ -68,6 +71,34 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate input
+	var validationErrors validation.ValidationErrors
+	if err := validation.ValidateEmail(req.Email); err != nil {
+		validationErrors = append(validationErrors, validation.ValidationError{
+			Field:   "email",
+			Message: err.Error(),
+		})
+	}
+	if err := validation.ValidatePassword(req.Password); err != nil {
+		validationErrors = append(validationErrors, validation.ValidationError{
+			Field:   "password",
+			Message: err.Error(),
+		})
+	}
+
+	if len(validationErrors) > 0 {
+		h.logger.Warn("Validation failed for register request", "errors", validationErrors)
+		var errorMessages []string
+		for _, err := range validationErrors {
+			errorMessages = append(errorMessages, err.Message)
+		}
+		h.securityLogger.LogInvalidInput(r, errorMessages)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(validationErrors.ToJSON())
+		return
+	}
+
 	createReq := &models.CreateUserRequest{
 		Email:    req.Email,
 		Password: req.Password,
@@ -109,9 +140,38 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate input
+	var validationErrors validation.ValidationErrors
+	if err := validation.ValidateEmail(req.Email); err != nil {
+		validationErrors = append(validationErrors, validation.ValidationError{
+			Field:   "email",
+			Message: err.Error(),
+		})
+	}
+	if req.Password == "" {
+		validationErrors = append(validationErrors, validation.ValidationError{
+			Field:   "password",
+			Message: "password is required",
+		})
+	}
+
+	if len(validationErrors) > 0 {
+		h.logger.Warn("Validation failed for login request", "errors", validationErrors)
+		var errorMessages []string
+		for _, err := range validationErrors {
+			errorMessages = append(errorMessages, err.Message)
+		}
+		h.securityLogger.LogInvalidInput(r, errorMessages)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(validationErrors.ToJSON())
+		return
+	}
+
 	accessToken, refreshToken, err := h.authService.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
 		h.logger.Error("Failed to login user", "error", err, "email", req.Email)
+		h.securityLogger.LogFailedAuth(r, "invalid_credentials")
 		http.Error(w, `{"error":{"code":"INVALID_CREDENTIALS","message":"Invalid email or password"}}`, http.StatusUnauthorized)
 		return
 	}
