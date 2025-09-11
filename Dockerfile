@@ -41,6 +41,9 @@ COPY --from=builder /app/server .
 # Copy swagger docs
 COPY --from=builder /app/docs ./docs
 
+# Copy migrations
+COPY --from=builder /app/migrations ./migrations
+
 # Change ownership to appuser
 RUN chown -R appuser:appuser /app
 

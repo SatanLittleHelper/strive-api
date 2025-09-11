@@ -3,6 +3,7 @@ package migrate
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/aleksandr/strive-api/internal/config"
@@ -25,7 +26,19 @@ func Run(cfg *config.Config, log *logger.Logger) error {
 		return fmt.Errorf("failed to create postgres driver: %w", err)
 	}
 
-	migrationsPath := filepath.Join("migrations")
+	// Get current working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	migrationsPath := filepath.Join(wd, "migrations")
+
+	// Check if migrations directory exists
+	if _, err := os.Stat(migrationsPath); os.IsNotExist(err) {
+		return fmt.Errorf("migrations directory not found: %s", migrationsPath)
+	}
+
 	sourceURL := fmt.Sprintf("file://%s", migrationsPath)
 
 	m, err := migrate.NewWithDatabaseInstance(sourceURL, "postgres", driver)
@@ -34,7 +47,7 @@ func Run(cfg *config.Config, log *logger.Logger) error {
 	}
 	defer m.Close()
 
-	log.Info("Running database migrations", "path", migrationsPath)
+	log.Info("Running database migrations", "path", migrationsPath, "working_dir", wd)
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("failed to run migrations: %w", err)
