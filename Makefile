@@ -1,6 +1,20 @@
-.PHONY: run test lint format clean build
+.PHONY: run run-dev test lint format clean build
 
 run:
+	go run ./cmd/server
+
+run-dev:
+	@echo "Starting server with development environment variables..."
+	PORT=8080 \
+	LOG_LEVEL=INFO \
+	LOG_FORMAT=json \
+	DB_HOST=localhost \
+	DB_PORT=5432 \
+	DB_USER=postgres \
+	DB_PASSWORD=password \
+	DB_NAME=strive \
+	DB_SSL_MODE=disable \
+	JWT_SECRET=dev-secret-key-12345 \
 	go run ./cmd/server
 
 test:

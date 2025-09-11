@@ -11,6 +11,7 @@ type Config struct {
 	Server ServerConfig
 	Log    LogConfig
 	DB     DatabaseConfig
+	JWT    JWTConfig
 }
 
 type ServerConfig struct {
@@ -36,6 +37,10 @@ type DatabaseConfig struct {
 	MinConns int32
 }
 
+type JWTConfig struct {
+	Secret string
+}
+
 func Load() (*Config, error) {
 	config := &Config{
 		Server: ServerConfig{
@@ -57,6 +62,9 @@ func Load() (*Config, error) {
 			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 			MaxConns: int32(getEnvInt("DB_MAX_CONNS", 25)),
 			MinConns: int32(getEnvInt("DB_MIN_CONNS", 5)),
+		},
+		JWT: JWTConfig{
+			Secret: getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 		},
 	}
 
