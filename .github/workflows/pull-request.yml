@@ -1,147 +1,81 @@
-name: Pull Request
+name: Pull Request CI
 
 on:
   pull_request:
-    branches: ['*']
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: strive_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     env:
-      DB_HOST: localhost
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: password
-      DB_NAME: strive_test
-      DB_SSL_MODE: disable
-      JWT_SECRET: test-secret-key-12345
-
+      GOFLAGS: -buildvcs=false
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.25'
-        cache: true
-        cache-dependency-path: go.sum
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          check-latest: true
 
-    - name: Clear Go cache
-      run: |
-        echo "🧹 Clearing Go cache..."
-        go clean -cache
-        go clean -modcache
-        go clean -testcache
-        rm -rf ~/.cache/go-build
-        echo "✅ Go cache cleared"
+      - name: Cache Go build and mod
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-    - name: Install tools
-      run: make install-tools
+      - name: Install tools
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
+          go install mvdan.cc/gofumpt@v0.7.0
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
 
-    - name: Force rebuild packages
-      run: |
-        echo "🔨 Force rebuilding all packages..."
-        go build ./...
-        echo "✅ All packages rebuilt"
+      - name: Download deps
+        run: make deps
 
-    - name: Format check
-      run: |
-        echo "🎨 Checking code formatting..."
-        make format
-        if [ -n "$(git status --porcelain)" ]; then
-          echo "❌ Code is not properly formatted"
-          echo "Please run 'make format' to fix formatting issues"
-          git diff
-          exit 1
-        fi
-        echo "✅ Code formatting is correct"
+      - name: Cache golangci-lint
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/golangci-lint
+          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-golangci-lint-
 
-    - name: Lint
-      run: |
-        echo "🔍 Running linter..."
-        make lint
-        echo "✅ Linting passed"
+      - name: Format check (gofumpt)
+        run: |
+          CHANGED=$(gofumpt -l .); if [ -n "$CHANGED" ]; then echo "$CHANGED" && echo "Run make format" && exit 1; fi
 
-    - name: Wait for PostgreSQL
-      run: |
-        echo "⏳ Waiting for PostgreSQL to be ready..."
-        until pg_isready -h localhost -p 5432 -U postgres; do
-          echo "Waiting for PostgreSQL..."
-          sleep 2
-        done
-        echo "✅ PostgreSQL is ready"
+      - name: Imports check (goimports)
+        run: |
+          CHANGED=$(goimports -l .); if [ -n "$CHANGED" ]; then echo "$CHANGED" && echo "Run make format" && exit 1; fi
 
-    - name: Run migrations
-      run: |
-        echo "🚀 Running database migrations..."
-        make migrate-up
-        echo "✅ Migrations completed"
+      - name: Lint
+        run: make lint
 
-    - name: Run tests with coverage
-      run: |
-        echo "🧪 Running tests with coverage..."
-        make test-coverage
-        coverage_percent=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}')
-        echo "✅ Test coverage: $coverage_percent"
+      - name: Build
+        run: make build
 
-    - name: Build applications
-      run: |
-        echo "🔨 Building applications..."
-        make build
-        go build -v ./cmd/migrate
-        echo "✅ Build successful"
+      - name: Vulnerability check
+        run: govulncheck ./...
 
-    - name: Security scan
-      run: |
-        echo "🔒 Running vulnerability scan..."
-        make security
-        echo "✅ Security scan completed"
+      - name: Test with coverage
+        run: make test-coverage
 
-    - name: Build Docker image
-      run: |
-        echo "🐳 Building Docker image..."
-        docker build -t strive-api:pr-${{ github.event.number }} .
-        echo "✅ Docker image build successful"
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.html
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
 
-    - name: PR Summary
-      run: |
-        echo "## 🎉 Pull Request Check Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| 🎨 Code formatting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔍 Linting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🚀 Database migrations | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🧪 Tests with coverage | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔨 Applications build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔒 Security scan | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🐳 Docker build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🚀 **Your pull request is ready for review!**" >> $GITHUB_STEP_SUMMARY
