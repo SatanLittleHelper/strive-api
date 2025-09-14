@@ -45,6 +45,13 @@ jobs:
         cache: true
         cache-dependency-path: go.sum
 
+    - name: Clear Go cache
+      run: |
+        echo "🧹 Clearing Go cache..."
+        go clean -cache
+        go clean -modcache
+        echo "✅ Go cache cleared"
+
     - name: Install tools
       run: make install-tools
 

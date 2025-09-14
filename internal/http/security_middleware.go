@@ -118,6 +118,5 @@ func isSuspiciousRequest(r *http.Request) bool {
 		}
 	}
 
-	// Check for unusually long requests
 	return len(r.URL.RawQuery) > 2048
 }
