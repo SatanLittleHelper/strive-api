@@ -75,7 +75,7 @@
 				
 				<option value="file9">github.com/aleksandr/strive-api/internal/http/middleware.go (100.0%)</option>
 				
-				<option value="file10">github.com/aleksandr/strive-api/internal/http/security_middleware.go (33.3%)</option>
+				<option value="file10">github.com/aleksandr/strive-api/internal/http/security_middleware.go (35.7%)</option>
 				
 				<option value="file11">github.com/aleksandr/strive-api/internal/http/server.go (0.0%)</option>
 				
@@ -1449,12 +1449,7 @@ func isSuspiciousRequest(r *http.Request) bool <span class="cov0" title="0">{
                 }</span>
         }
 
-        // Check for unusually long requests
-        <span class="cov0" title="0">if len(r.URL.RawQuery) &gt; 2048 </span><span class="cov0" title="0">{
-                return true
-        }</span>
-
-        <span class="cov0" title="0">return false</span>
+        <span class="cov0" title="0">return len(r.URL.RawQuery) &gt; 2048</span>
 }
 </pre>
 		

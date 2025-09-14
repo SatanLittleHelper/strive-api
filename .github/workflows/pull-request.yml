@@ -33,11 +33,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Install tools
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
-          go install mvdan.cc/gofumpt@v0.7.0
-          go install golang.org/x/tools/cmd/goimports@latest
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: make install-tools
 
       - name: Download deps
         run: make deps
@@ -51,12 +47,10 @@ jobs:
             ${{ runner.os }}-golangci-lint-
 
       - name: Format check (gofumpt)
-        run: |
-          CHANGED=$(gofumpt -l .); if [ -n "$CHANGED" ]; then echo "$CHANGED" && echo "Run make format" && exit 1; fi
+        run: make format-check
 
       - name: Imports check (goimports)
-        run: |
-          CHANGED=$(goimports -l .); if [ -n "$CHANGED" ]; then echo "$CHANGED" && echo "Run make format" && exit 1; fi
+        run: make imports-check
 
       - name: Lint
         run: make lint
@@ -65,7 +59,7 @@ jobs:
         run: make build
 
       - name: Vulnerability check
-        run: govulncheck ./...
+        run: make security
 
       - name: Test with coverage
         run: make test-coverage

@@ -1,4 +1,4 @@
-.PHONY: run run-dev test lint format security clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs migrate-up migrate-down
+.PHONY: run run-dev test lint format format-check imports-check security clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs migrate-up migrate-down
 
 run:
 	go run ./cmd/server
@@ -49,6 +49,14 @@ lint:
 format:
 	gofumpt -l -w .
 	goimports -w .
+
+format-check:
+	@CHANGED=$(gofumpt -l .); \
+	if [ -n "$$CHANGED" ]; then echo "$$CHANGED" && echo "Run make format" && exit 1; fi
+
+imports-check:
+	@CHANGED=$(goimports -l .); \
+	if [ -n "$$CHANGED" ]; then echo "$$CHANGED" && echo "Run make format" && exit 1; fi
 
 security:
 	govulncheck ./...
