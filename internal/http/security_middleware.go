@@ -32,7 +32,14 @@ func (sl *SecurityLogger) LogSecurityEvent(event string, r *http.Request, detail
 		fields[k] = v
 	}
 
-	sl.logger.Warn("Security event", fields)
+	sl.logger.Warn("Security event",
+		"event", fields["event"],
+		"timestamp", fields["timestamp"],
+		"method", fields["method"],
+		"path", fields["path"],
+		"remote_addr", fields["remote_addr"],
+		"user_agent", fields["user_agent"],
+	)
 }
 
 func (sl *SecurityLogger) LogFailedAuth(r *http.Request, reason string) {

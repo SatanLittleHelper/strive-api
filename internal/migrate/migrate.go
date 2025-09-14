@@ -54,20 +54,20 @@ func createMigrator(cfg *config.Config) (*migrate.Migrate, func(), error) {
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, fmt.Errorf("failed to create postgres driver: %w", err)
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
 
 	migrationsPath := filepath.Join(wd, "migrations")
 
 	if _, err := os.Stat(migrationsPath); os.IsNotExist(err) {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, fmt.Errorf("migrations directory not found: %s", migrationsPath)
 	}
 
@@ -75,13 +75,13 @@ func createMigrator(cfg *config.Config) (*migrate.Migrate, func(), error) {
 
 	m, err := migrate.NewWithDatabaseInstance(sourceURL, "postgres", driver)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, fmt.Errorf("failed to create migrate instance: %w", err)
 	}
 
 	cleanup := func() {
-		m.Close()
-		db.Close()
+		_, _ = m.Close()
+		_ = db.Close()
 	}
 
 	return m, cleanup, nil

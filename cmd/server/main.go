@@ -138,7 +138,7 @@ func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, 
 	protectedMux.HandleFunc("/api/v1/user/profile", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message":"This is a protected endpoint"}`))
+		_, _ = w.Write([]byte(`{"message":"This is a protected endpoint"}`))
 	})
 
 	// Apply auth middleware to protected routes

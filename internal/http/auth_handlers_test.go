@@ -28,7 +28,7 @@ func TestAuthHandlers_Register(t *testing.T) {
 			name: "successful registration",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "password123",
+				"password": "Password123",
 			},
 			mockSetup: func(m *MockAuthService) {
 				user := &models.User{
@@ -47,8 +47,6 @@ func TestAuthHandlers_Register(t *testing.T) {
 				"email": "invalid-email",
 			},
 			mockSetup: func(m *MockAuthService) {
-				m.On("Register", mock.Anything, mock.AnythingOfType("*models.CreateUserRequest")).
-					Return(nil, assert.AnError)
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  true,
@@ -57,7 +55,7 @@ func TestAuthHandlers_Register(t *testing.T) {
 			name: "service error",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "password123",
+				"password": "Password123",
 			},
 			mockSetup: func(m *MockAuthService) {
 				m.On("Register", mock.Anything, mock.AnythingOfType("*models.CreateUserRequest")).
@@ -116,10 +114,10 @@ func TestAuthHandlers_Login(t *testing.T) {
 			name: "successful login",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "password123",
+				"password": "Password123",
 			},
 			mockSetup: func(m *MockAuthService) {
-				m.On("Login", mock.Anything, "test@example.com", "password123").
+				m.On("Login", mock.Anything, "test@example.com", "Password123").
 					Return("access_token", "refresh_token", nil)
 			},
 			expectedStatus: http.StatusOK,
@@ -144,10 +142,8 @@ func TestAuthHandlers_Login(t *testing.T) {
 				"email": "invalid-email",
 			},
 			mockSetup: func(m *MockAuthService) {
-				m.On("Login", mock.Anything, "invalid-email", "").
-					Return("", "", assert.AnError)
 			},
-			expectedStatus: http.StatusUnauthorized,
+			expectedStatus: http.StatusBadRequest,
 			expectedError:  true,
 		},
 	}
@@ -190,7 +186,6 @@ func TestHealthHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rr := httptest.NewRecorder()
 
-	// Create a DetailedHealthHandler without database for testing
 	logger := &logger.Logger{}
 	handler := NewDetailedHealthHandler(logger, nil)
 

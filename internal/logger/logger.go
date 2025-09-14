@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+type contextKey string
+
+const (
+	loggerKey contextKey = "logger"
+)
+
 type Logger struct {
 	*slog.Logger
 }
@@ -46,7 +52,7 @@ func New(level, format string) *Logger {
 
 func (l *Logger) WithRequestID(requestID string) *Logger {
 	return &Logger{
-		Logger: l.Logger.With("request_id", requestID),
+		Logger: l.With("request_id", requestID),
 	}
 }
 
@@ -95,5 +101,5 @@ func FromContext(ctx context.Context) *Logger {
 }
 
 func WithContext(ctx context.Context, logger *Logger) context.Context {
-	return context.WithValue(ctx, "logger", logger)
+	return context.WithValue(ctx, loggerKey, logger)
 }

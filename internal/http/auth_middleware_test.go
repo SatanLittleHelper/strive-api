@@ -31,7 +31,7 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 		assert.Equal(t, email, ctxEmail)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	middleware := AuthMiddleware(mockService)
@@ -148,7 +148,7 @@ func TestAuthMiddleware_ContextValues(t *testing.T) {
 		capturedEmail = ctx.Value(UserEmailKey).(string)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	middleware := AuthMiddleware(mockService)

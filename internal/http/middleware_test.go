@@ -14,7 +14,7 @@ func TestLoggingMiddleware(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test response"))
+		_, _ = w.Write([]byte("test response"))
 	})
 
 	middleware := LoggingMiddleware(logger)
@@ -31,12 +31,12 @@ func TestLoggingMiddleware(t *testing.T) {
 
 func TestRequestIDMiddleware(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestID := r.Context().Value("request_id")
+		requestID := r.Context().Value(requestIDKey)
 		assert.NotNil(t, requestID)
 		assert.NotEmpty(t, requestID)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test response"))
+		_, _ = w.Write([]byte("test response"))
 	})
 
 	middleware := RequestIDMiddleware()
@@ -55,11 +55,11 @@ func TestRequestIDMiddleware_ExistingID(t *testing.T) {
 	existingID := "existing-request-id"
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestID := r.Context().Value("request_id")
+		requestID := r.Context().Value(requestIDKey)
 		assert.Equal(t, existingID, requestID)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test response"))
+		_, _ = w.Write([]byte("test response"))
 	})
 
 	middleware := RequestIDMiddleware()
@@ -79,12 +79,12 @@ func TestMiddlewareChain(t *testing.T) {
 	log := logger.New("INFO", "json")
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestID := r.Context().Value("request_id")
+		requestID := r.Context().Value(requestIDKey)
 		assert.NotNil(t, requestID)
 		assert.NotEmpty(t, requestID)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test response"))
+		_, _ = w.Write([]byte("test response"))
 	})
 
 	chain := LoggingMiddleware(log)(RequestIDMiddleware()(handler))
@@ -103,11 +103,11 @@ func TestMiddlewareContext(t *testing.T) {
 		ctx := r.Context()
 		assert.NotNil(t, ctx)
 
-		requestID := ctx.Value("request_id")
+		requestID := ctx.Value(requestIDKey)
 		assert.NotNil(t, requestID)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test response"))
+		_, _ = w.Write([]byte("test response"))
 	})
 
 	middleware := RequestIDMiddleware()
