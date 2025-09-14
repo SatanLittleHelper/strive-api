@@ -36,6 +36,11 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required" example:"password123"`
 }
 
+// RefreshRequest represents refresh token request
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+}
+
 // AuthResponse represents authentication response
 type AuthResponse struct {
 	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
@@ -177,6 +182,54 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("User logged in successfully", "email", req.Email)
+
+	response := AuthResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresIn:    900, // 15 minutes
+		TokenType:    "Bearer",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// Refresh godoc
+// @Summary Refresh access token
+// @Description Refresh access token using refresh token
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param request body RefreshRequest true "Refresh token data"
+// @Success 200 {object} AuthResponse "Token refreshed successfully"
+// @Failure 400 {object} ErrorResponse "Invalid request data"
+// @Failure 401 {object} ErrorResponse "Invalid refresh token"
+// @Router /api/v1/auth/refresh [post]
+func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
+	var req RefreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error("Failed to decode refresh request", "error", err)
+		http.Error(w, `{"error":{"code":"INVALID_REQUEST","message":"Invalid JSON"}}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		h.logger.Warn("Empty refresh token provided")
+		h.securityLogger.LogInvalidInput(r, []string{"refresh_token is required"})
+		http.Error(w, `{"error":{"code":"VALIDATION_ERROR","message":"refresh_token is required"}}`, http.StatusBadRequest)
+		return
+	}
+
+	accessToken, refreshToken, err := h.authService.RefreshToken(r.Context(), req.RefreshToken)
+	if err != nil {
+		h.logger.Error("Failed to refresh token", "error", err)
+		h.securityLogger.LogFailedAuth(r, "invalid_refresh_token")
+		http.Error(w, `{"error":{"code":"INVALID_REFRESH_TOKEN","message":"Invalid or expired refresh token"}}`, http.StatusUnauthorized)
+		return
+	}
+
+	h.logger.Info("Token refreshed successfully")
 
 	response := AuthResponse{
 		AccessToken:  accessToken,
