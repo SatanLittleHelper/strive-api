@@ -35,8 +35,10 @@ jobs:
       - name: Install tools
         run: make install-tools
 
-      - name: Download deps
-        run: make deps
+      - name: Clean and download deps
+        run: |
+          go clean -modcache
+          make deps
 
       - name: Cache golangci-lint
         uses: actions/cache@v4
@@ -51,6 +53,9 @@ jobs:
 
       - name: Imports check (goimports)
         run: make imports-check
+
+      - name: Go vet
+        run: go vet ./...
 
       - name: Lint
         run: make lint
