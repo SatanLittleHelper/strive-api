@@ -41,7 +41,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23'
+        go-version: '1.25'
         cache: true
         cache-dependency-path: go.sum
 
@@ -50,10 +50,18 @@ jobs:
         echo "🧹 Clearing Go cache..."
         go clean -cache
         go clean -modcache
+        go clean -testcache
+        rm -rf ~/.cache/go-build
         echo "✅ Go cache cleared"
 
     - name: Install tools
       run: make install-tools
+
+    - name: Force rebuild packages
+      run: |
+        echo "🔨 Force rebuilding all packages..."
+        go build ./...
+        echo "✅ All packages rebuilt"
 
     - name: Format check
       run: |
