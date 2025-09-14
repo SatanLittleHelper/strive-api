@@ -190,7 +190,11 @@ func TestHealthHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rr := httptest.NewRecorder()
 
-	HealthHandler(rr, req)
+	// Create a DetailedHealthHandler without database for testing
+	logger := &logger.Logger{}
+	handler := NewDetailedHealthHandler(logger, nil)
+
+	handler.Health(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))

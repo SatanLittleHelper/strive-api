@@ -18,7 +18,7 @@ A modern workout diary API built with Go, featuring user authentication, JWT tok
 
 ## 📋 Requirements
 
-- Go 1.22+
+- Go 1.23+
 - PostgreSQL 15+
 - Docker & Docker Compose (optional)
 - Make (optional, for convenience commands)
