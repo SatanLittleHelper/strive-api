@@ -58,8 +58,8 @@ jobs:
         echo "🔍 Verifying installed versions..."
         go version
         golangci-lint --version
-        gofumpt --version
-        goimports --version
+        gofumpt -version
+        echo "goimports: $(which goimports)"
 
     - name: Format check
       run: |
