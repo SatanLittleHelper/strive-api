@@ -7,6 +7,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.22', '1.23']
     
     services:
       postgres:
@@ -41,30 +44,16 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
-        cache: false
-
-    - name: Clean Go cache
-      run: |
-        go clean -cache
-        go clean -modcache
-
-    - name: Install dependencies
-      run: go mod download
+        go-version: ${{ matrix.go-version }}
+        cache: true
+        cache-dependency-path: go.sum
 
     - name: Install tools
       run: |
         go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
         go install mvdan.cc/gofumpt@v0.7.0
         go install golang.org/x/tools/cmd/goimports@latest
-
-    - name: Verify versions
-      run: |
-        echo "🔍 Verifying installed versions..."
-        go version
-        golangci-lint --version
-        gofumpt -version
-        echo "goimports: $(which goimports)"
+        go install golang.org/x/vuln/cmd/govulncheck@latest
 
     - name: Format check
       run: |
@@ -82,15 +71,7 @@ jobs:
     - name: Lint
       run: |
         echo "🔍 Running linter..."
-        echo "Debug: Checking Go modules status..."
-        go mod verify
-        echo "Debug: Building packages..."
-        go build ./...
-        echo "Debug: Running linter with verbose output..."
-        echo "Debug: Checking for compilation issues..."
-        go test -c ./internal/http
-        echo "Debug: Running golangci-lint..."
-        golangci-lint run --verbose
+        golangci-lint run
         echo "✅ Linting passed"
 
     - name: Wait for PostgreSQL
@@ -108,30 +89,25 @@ jobs:
         go run ./cmd/migrate -direction=up
         echo "✅ Migrations completed"
 
-    - name: Run tests
-      run: |
-        echo "🧪 Running tests..."
-        go test ./... -count=1 -race -timeout=60s -v
-        echo "✅ All tests passed"
-
     - name: Run tests with coverage
       run: |
-        echo "📊 Generating test coverage..."
-        go test ./... -count=1 -race -timeout=60s -coverprofile=coverage.out
+        echo "🧪 Running tests with coverage..."
+        go test ./... -count=1 -race -timeout=60s -coverprofile=coverage.out -v
         coverage_percent=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}')
         echo "✅ Test coverage: $coverage_percent"
 
-    - name: Build application
+    - name: Build applications
       run: |
-        echo "🔨 Building main application..."
+        echo "🔨 Building applications..."
         go build -v ./cmd/server
-        echo "✅ Main application build successful"
-
-    - name: Build migration tool
-      run: |
-        echo "🔨 Building migration tool..."
         go build -v ./cmd/migrate
-        echo "✅ Migration tool build successful"
+        echo "✅ Build successful"
+
+    - name: Security scan
+      run: |
+        echo "🔒 Running vulnerability scan..."
+        govulncheck ./...
+        echo "✅ Security scan completed"
 
     - name: Build Docker image
       run: |
@@ -139,13 +115,8 @@ jobs:
         docker build -t strive-api:pr-${{ github.event.number }} .
         echo "✅ Docker image build successful"
 
-    - name: Security check
-      run: |
-        echo "🔒 Running security checks..."
-        go list -json -deps ./... | grep -v test | jq -r '.Module.Path' | sort -u | xargs go list -versions 2>/dev/null || true
-        echo "✅ Security check completed"
-
     - name: Upload coverage to Codecov
+      if: matrix.go-version == '1.23'
       uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
@@ -154,6 +125,7 @@ jobs:
         fail_ci_if_error: false
 
     - name: PR Summary
+      if: matrix.go-version == '1.23'
       run: |
         echo "## 🎉 Pull Request Check Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -162,11 +134,9 @@ jobs:
         echo "| 🎨 Code formatting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
         echo "| 🔍 Linting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
         echo "| 🚀 Database migrations | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🧪 Tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 📊 Coverage | ✅ Generated |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔨 Application build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔨 Migration tool build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🧪 Tests with coverage | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔨 Applications build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔒 Security scan | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
         echo "| 🐳 Docker build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-        echo "| 🔒 Security check | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "🚀 **Your pull request is ready for review!**" >> $GITHUB_STEP_SUMMARY

@@ -1,4 +1,4 @@
-.PHONY: run run-dev test lint format clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs migrate-up migrate-down
+.PHONY: run run-dev test lint format security clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs migrate-up migrate-down
 
 run:
 	go run ./cmd/server
@@ -49,6 +49,9 @@ lint:
 format:
 	gofumpt -l -w .
 	goimports -w .
+
+security:
+	govulncheck ./...
 
 docs:
 	@echo "Generating API documentation..."
@@ -103,9 +106,10 @@ deps:
 	go mod tidy
 
 install-tools:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	go install mvdan.cc/gofumpt@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
+	go install mvdan.cc/gofumpt@v0.7.0
 	go install golang.org/x/tools/cmd/goimports@latest
+	go install golang.org/x/vuln/cmd/govulncheck@latest
 
 migrate-up:
 	@echo "Running database migrations up..."
