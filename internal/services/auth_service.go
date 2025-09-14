@@ -18,6 +18,7 @@ type AuthService interface {
 	ValidateToken(tokenString string) (*Claims, error)
 	HashPassword(password string) (string, error)
 	VerifyPassword(hashedPassword, password string) error
+	RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
 }
 
 type Claims struct {
@@ -119,6 +120,30 @@ func (s *authService) HashPassword(password string) (string, error) {
 
 func (s *authService) VerifyPassword(hashedPassword, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+	claims, err := s.ValidateToken(refreshToken)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	user := &models.User{
+		ID:    claims.UserID,
+		Email: claims.Email,
+	}
+
+	accessToken, err := s.generateToken(user, s.accessTTL)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate new access token: %w", err)
+	}
+
+	newRefreshToken, err := s.generateToken(user, s.refreshTTL)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate new refresh token: %w", err)
+	}
+
+	return accessToken, newRefreshToken, nil
 }
 
 func (s *authService) generateToken(user *models.User, ttl time.Duration) (string, error) {
