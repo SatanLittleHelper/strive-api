@@ -1,4 +1,4 @@
-.PHONY: run run-dev test lint format format-check imports-check security clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs migrate-up migrate-down
+.PHONY: run run-dev test lint format format-check imports-check security clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs migrate-up migrate-down verify-go-version
 
 run:
 	go run ./cmd/server
@@ -112,6 +112,15 @@ clean:
 deps:
 	go mod download
 	go mod tidy
+
+verify-go-version:
+	@EXPECTED="1.23"; \
+	ACTUAL=$$(awk '/^go [0-9]/ {print $$2}' go.mod); \
+	if [ "$$ACTUAL" != "$$EXPECTED" ]; then \
+		echo "go.mod go version is $$ACTUAL, expected $$EXPECTED"; \
+		exit 1; \
+	fi; \
+	echo "go.mod go version OK: $$ACTUAL"
 
 install-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
