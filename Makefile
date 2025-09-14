@@ -109,7 +109,7 @@ install-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
 	go install mvdan.cc/gofumpt@v0.7.0
 	go install golang.org/x/tools/cmd/goimports@latest
-	go install golang.org/x/vuln/cmd/govulncheck@latest
+	go install golang.org/x/vuln/cmd/govulncheck@v1.1.0
 
 migrate-up:
 	@echo "Running database migrations up..."

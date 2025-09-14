@@ -7,9 +7,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.22', '1.23']
     
     services:
       postgres:
@@ -44,22 +41,17 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: '1.23'
         cache: true
         cache-dependency-path: go.sum
 
     - name: Install tools
-      run: |
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.0
-        go install mvdan.cc/gofumpt@v0.7.0
-        go install golang.org/x/tools/cmd/goimports@latest
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+      run: make install-tools
 
     - name: Format check
       run: |
         echo "🎨 Checking code formatting..."
-        gofumpt -l -w .
-        goimports -w .
+        make format
         if [ -n "$(git status --porcelain)" ]; then
           echo "❌ Code is not properly formatted"
           echo "Please run 'make format' to fix formatting issues"
@@ -71,7 +63,7 @@ jobs:
     - name: Lint
       run: |
         echo "🔍 Running linter..."
-        golangci-lint run
+        make lint
         echo "✅ Linting passed"
 
     - name: Wait for PostgreSQL
@@ -86,27 +78,27 @@ jobs:
     - name: Run migrations
       run: |
         echo "🚀 Running database migrations..."
-        go run ./cmd/migrate -direction=up
+        make migrate-up
         echo "✅ Migrations completed"
 
     - name: Run tests with coverage
       run: |
         echo "🧪 Running tests with coverage..."
-        go test ./... -count=1 -race -timeout=60s -coverprofile=coverage.out -v
+        make test-coverage
         coverage_percent=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}')
         echo "✅ Test coverage: $coverage_percent"
 
     - name: Build applications
       run: |
         echo "🔨 Building applications..."
-        go build -v ./cmd/server
+        make build
         go build -v ./cmd/migrate
         echo "✅ Build successful"
 
     - name: Security scan
       run: |
         echo "🔒 Running vulnerability scan..."
-        govulncheck ./...
+        make security
         echo "✅ Security scan completed"
 
     - name: Build Docker image
@@ -116,7 +108,6 @@ jobs:
         echo "✅ Docker image build successful"
 
     - name: Upload coverage to Codecov
-      if: matrix.go-version == '1.23'
       uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
@@ -125,7 +116,6 @@ jobs:
         fail_ci_if_error: false
 
     - name: PR Summary
-      if: matrix.go-version == '1.23'
       run: |
         echo "## 🎉 Pull Request Check Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
