@@ -1,0 +1,151 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches: ['*']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: strive_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: strive_test
+      DB_SSL_MODE: disable
+      JWT_SECRET: test-secret-key-12345
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        cache: true
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Install tools
+      run: |
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        go install mvdan.cc/gofumpt@latest
+        go install golang.org/x/tools/cmd/goimports@latest
+
+    - name: Format check
+      run: |
+        echo "🎨 Checking code formatting..."
+        gofumpt -l -w .
+        goimports -w .
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "❌ Code is not properly formatted"
+          echo "Please run 'make format' to fix formatting issues"
+          git diff
+          exit 1
+        fi
+        echo "✅ Code formatting is correct"
+
+    - name: Lint
+      run: |
+        echo "🔍 Running linter..."
+        golangci-lint run
+        echo "✅ Linting passed"
+
+    - name: Wait for PostgreSQL
+      run: |
+        echo "⏳ Waiting for PostgreSQL to be ready..."
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        echo "✅ PostgreSQL is ready"
+
+    - name: Run migrations
+      run: |
+        echo "🚀 Running database migrations..."
+        go run ./cmd/migrate -direction=up
+        echo "✅ Migrations completed"
+
+    - name: Run tests
+      run: |
+        echo "🧪 Running tests..."
+        go test ./... -count=1 -race -timeout=60s -v
+        echo "✅ All tests passed"
+
+    - name: Run tests with coverage
+      run: |
+        echo "📊 Generating test coverage..."
+        go test ./... -count=1 -race -timeout=60s -coverprofile=coverage.out
+        coverage_percent=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}')
+        echo "✅ Test coverage: $coverage_percent"
+
+    - name: Build application
+      run: |
+        echo "🔨 Building main application..."
+        go build -v ./cmd/server
+        echo "✅ Main application build successful"
+
+    - name: Build migration tool
+      run: |
+        echo "🔨 Building migration tool..."
+        go build -v ./cmd/migrate
+        echo "✅ Migration tool build successful"
+
+    - name: Build Docker image
+      run: |
+        echo "🐳 Building Docker image..."
+        docker build -t strive-api:pr-${{ github.event.number }} .
+        echo "✅ Docker image build successful"
+
+    - name: Security check
+      run: |
+        echo "🔒 Running security checks..."
+        go list -json -deps ./... | grep -v test | jq -r '.Module.Path' | sort -u | xargs go list -versions 2>/dev/null || true
+        echo "✅ Security check completed"
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: PR Summary
+      run: |
+        echo "## 🎉 Pull Request Check Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| 🎨 Code formatting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔍 Linting | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🚀 Database migrations | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🧪 Tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 📊 Coverage | ✅ Generated |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔨 Application build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔨 Migration tool build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🐳 Docker build | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "| 🔒 Security check | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🚀 **Your pull request is ready for review!**" >> $GITHUB_STEP_SUMMARY

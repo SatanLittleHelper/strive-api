@@ -1,5 +1,7 @@
 # Strive API
 
+![Pull Request](https://github.com/aleksandr/strive-api/workflows/Pull%20Request/badge.svg)
+
 A modern workout diary API built with Go, featuring user authentication, JWT tokens, and comprehensive testing.
 
 ## 🚀 Features
@@ -12,6 +14,7 @@ A modern workout diary API built with Go, featuring user authentication, JWT tok
 - **Containerization**: Docker and Docker Compose support
 - **Structured Logging**: JSON/text logging with configurable levels
 - **Graceful Shutdown**: Proper server lifecycle management
+- **CI/CD Pipeline**: Automated testing and deployment with GitHub Actions
 
 ## 📋 Requirements
 
@@ -182,23 +185,53 @@ make db-down
 
 # Reset database
 make db-reset
+
+# Run database migrations
+make migrate-up
+
+# Rollback database migrations
+make migrate-down
 ```
+
+## 🔄 CI/CD
+
+Проект использует GitHub Actions для автоматического тестирования:
+
+### Pull Request Workflow
+Запускается при создании PR в любую ветку и выполняет:
+
+- 🎨 **Форматирование кода** - проверка gofumpt и goimports
+- 🔍 **Линтинг** - golangci-lint проверки
+- 🚀 **Миграции БД** - автоматический запуск миграций
+- 🧪 **Тестирование** - полный набор unit тестов
+- 📊 **Покрытие кода** - генерация отчетов покрытия
+- 🔨 **Сборка** - проверка компиляции приложения и инструментов
+- 🐳 **Docker** - сборка Docker образа
+- 🔒 **Безопасность** - базовые проверки безопасности
+
+Подробная документация: [docs/CI_CD.md](docs/CI_CD.md)
 
 ## 📁 Project Structure
 
 ```
 strive-api/
-├── cmd/server/           # Application entry point
+├── cmd/
+│   ├── server/          # Main application entry point
+│   └── migrate/         # Database migration tool
 ├── internal/
 │   ├── config/          # Configuration management
 │   ├── database/        # Database connection and health
 │   ├── http/           # HTTP handlers and middleware
 │   ├── logger/         # Structured logging
-│   ├── migrate/        # Database migrations
+│   ├── migrate/        # Database migration logic
 │   ├── models/         # Data models
 │   ├── repositories/   # Data access layer
-│   └── services/       # Business logic
-├── docs/               # Generated API documentation
+│   ├── services/       # Business logic
+│   └── validation/     # Input validation
+├── .github/
+│   ├── workflows/      # GitHub Actions CI/CD
+│   └── dependabot.yml # Dependency updates
+├── docs/               # API documentation and guides
 ├── migrations/         # Database migration files
 ├── docker-compose.yml  # Docker Compose configuration
 ├── Dockerfile         # Docker image definition

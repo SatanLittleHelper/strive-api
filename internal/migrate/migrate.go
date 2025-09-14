@@ -15,50 +15,86 @@ import (
 )
 
 func Run(cfg *config.Config, log *logger.Logger) error {
+	m, cleanup, err := createMigrator(cfg)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	log.Info("Running database migrations up")
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run up migrations: %w", err)
+	}
+
+	return logMigrationStatus(m, log, "up")
+}
+
+func Down(cfg *config.Config, log *logger.Logger) error {
+	m, cleanup, err := createMigrator(cfg)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	log.Info("Running database migrations down")
+
+	if err := m.Down(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run down migrations: %w", err)
+	}
+
+	return logMigrationStatus(m, log, "down")
+}
+
+func createMigrator(cfg *config.Config) (*migrate.Migrate, func(), error) {
 	db, err := sql.Open("pgx", cfg.DatabaseURL())
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return nil, nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		return fmt.Errorf("failed to create postgres driver: %w", err)
+		db.Close()
+		return nil, nil, fmt.Errorf("failed to create postgres driver: %w", err)
 	}
 
-	// Get current working directory
 	wd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		db.Close()
+		return nil, nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
 
 	migrationsPath := filepath.Join(wd, "migrations")
 
-	// Check if migrations directory exists
 	if _, err := os.Stat(migrationsPath); os.IsNotExist(err) {
-		return fmt.Errorf("migrations directory not found: %s", migrationsPath)
+		db.Close()
+		return nil, nil, fmt.Errorf("migrations directory not found: %s", migrationsPath)
 	}
 
 	sourceURL := fmt.Sprintf("file://%s", migrationsPath)
 
 	m, err := migrate.NewWithDatabaseInstance(sourceURL, "postgres", driver)
 	if err != nil {
-		return fmt.Errorf("failed to create migrate instance: %w", err)
-	}
-	defer m.Close()
-
-	log.Info("Running database migrations", "path", migrationsPath, "working_dir", wd)
-
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("failed to run migrations: %w", err)
+		db.Close()
+		return nil, nil, fmt.Errorf("failed to create migrate instance: %w", err)
 	}
 
+	cleanup := func() {
+		m.Close()
+		db.Close()
+	}
+
+	return m, cleanup, nil
+}
+
+func logMigrationStatus(m *migrate.Migrate, log *logger.Logger, direction string) error {
 	version, dirty, err := m.Version()
 	if err != nil && err != migrate.ErrNilVersion {
 		return fmt.Errorf("failed to get migration version: %w", err)
 	}
 
 	log.Info("Database migrations completed successfully",
+		"direction", direction,
 		"version", version,
 		"dirty", dirty,
 	)

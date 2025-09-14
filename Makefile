@@ -1,4 +1,4 @@
-.PHONY: run run-dev test lint format clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs
+.PHONY: run run-dev test lint format clean build db-up db-down db-reset docker-up docker-down docker-restart docker-logs migrate-up migrate-down
 
 run:
 	go run ./cmd/server
@@ -106,3 +106,11 @@ install-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install mvdan.cc/gofumpt@latest
 	go install golang.org/x/tools/cmd/goimports@latest
+
+migrate-up:
+	@echo "Running database migrations up..."
+	go run ./cmd/migrate -direction=up
+
+migrate-down:
+	@echo "Running database migrations down..."
+	go run ./cmd/migrate -direction=down

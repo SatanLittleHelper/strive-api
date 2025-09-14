@@ -99,7 +99,6 @@ func TestMiddlewareChain(t *testing.T) {
 }
 
 func TestMiddlewareContext(t *testing.T) {
-
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		assert.NotNil(t, ctx)
