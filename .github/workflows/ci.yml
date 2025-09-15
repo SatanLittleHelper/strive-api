@@ -33,6 +33,7 @@ jobs:
         with:
           version: v1.61.0
           args: --timeout=5m
+          install-mode: goinstall
 
   test:
     runs-on: ubuntu-latest
