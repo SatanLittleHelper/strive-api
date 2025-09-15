@@ -28,7 +28,7 @@ func TestAuthHandlers_Register(t *testing.T) {
 			name: "successful registration",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "password123",
+				"password": "Password123",
 			},
 			mockSetup: func(m *MockAuthService) {
 				user := &models.User{
@@ -46,10 +46,7 @@ func TestAuthHandlers_Register(t *testing.T) {
 			requestBody: map[string]string{
 				"email": "invalid-email",
 			},
-			mockSetup: func(m *MockAuthService) {
-				m.On("Register", mock.Anything, mock.AnythingOfType("*models.CreateUserRequest")).
-					Return(nil, assert.AnError)
-			},
+			mockSetup:      func(m *MockAuthService) {},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  true,
 		},
@@ -57,7 +54,7 @@ func TestAuthHandlers_Register(t *testing.T) {
 			name: "service error",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "password123",
+				"password": "Password123",
 			},
 			mockSetup: func(m *MockAuthService) {
 				m.On("Register", mock.Anything, mock.AnythingOfType("*models.CreateUserRequest")).
@@ -143,11 +140,8 @@ func TestAuthHandlers_Login(t *testing.T) {
 			requestBody: map[string]string{
 				"email": "invalid-email",
 			},
-			mockSetup: func(m *MockAuthService) {
-				m.On("Login", mock.Anything, "invalid-email", "").
-					Return("", "", assert.AnError)
-			},
-			expectedStatus: http.StatusUnauthorized,
+			mockSetup:      func(m *MockAuthService) {},
+			expectedStatus: http.StatusBadRequest,
 			expectedError:  true,
 		},
 	}
@@ -187,7 +181,7 @@ func TestAuthHandlers_Login(t *testing.T) {
 }
 
 func TestHealthHandler(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	HealthHandler(rr, req)

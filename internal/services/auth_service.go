@@ -123,7 +123,6 @@ func (s *authService) ValidateToken(tokenString string) (*Claims, error) {
 		}
 		return []byte(s.jwtSecret), nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}

@@ -19,7 +19,7 @@ func Run(cfg *config.Config, log *logger.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -45,7 +45,7 @@ func Run(cfg *config.Config, log *logger.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 
 	log.Info("Running database migrations", "path", migrationsPath, "working_dir", wd)
 

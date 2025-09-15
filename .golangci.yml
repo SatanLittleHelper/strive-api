@@ -25,6 +25,8 @@ linters-settings:
       - octalLiteral
       - whyNoLint
       - wrapperFunc
+      - importShadow
+      - unnamedResult
   revive:
     severity: warning
 

@@ -32,7 +32,7 @@ func (sl *SecurityLogger) LogSecurityEvent(event string, r *http.Request, detail
 		fields[k] = v
 	}
 
-	sl.logger.Warn("Security event", fields)
+	sl.logger.Warn("Security event", "fields", fields)
 }
 
 func (sl *SecurityLogger) LogFailedAuth(r *http.Request, reason string) {
@@ -60,9 +60,7 @@ func (sl *SecurityLogger) LogInvalidInput(r *http.Request, validationErrors []st
 }
 
 func getClientIP(r *http.Request) string {
-	// Check for forwarded headers
 	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		// Take the first IP in case of multiple proxies
 		if idx := strings.Index(ip, ","); idx != -1 {
 			return strings.TrimSpace(ip[:idx])
 		}
@@ -78,19 +76,16 @@ func getClientIP(r *http.Request) string {
 func (sl *SecurityLogger) SecurityMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Log suspicious patterns
 			if isSuspiciousRequest(r) {
 				sl.LogSuspiciousActivity(r, "suspicious_request_pattern")
 			}
 
-			// Continue with the request
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
 func isSuspiciousRequest(r *http.Request) bool {
-	// Check for common attack patterns
 	suspiciousPatterns := []string{
 		"../",
 		"<script",
@@ -111,10 +106,5 @@ func isSuspiciousRequest(r *http.Request) bool {
 		}
 	}
 
-	// Check for unusually long requests
-	if len(r.URL.RawQuery) > 2048 {
-		return true
-	}
-
-	return false
+	return len(r.URL.RawQuery) > 2048
 }
