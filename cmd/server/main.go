@@ -27,7 +27,7 @@ import (
 // @license.name MIT
 // @license.url https://opensource.org/licenses/MIT
 
-// @host localhost:8080
+// @host strive-api-zjtl.onrender.com
 // @BasePath /
 // @schemes http https
 

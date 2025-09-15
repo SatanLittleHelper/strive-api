@@ -15,6 +15,17 @@ definitions:
         example: Bearer
         type: string
     type: object
+  http.DetailedHealthResponse:
+    properties:
+      services:
+        additionalProperties:
+          $ref: '#/definitions/http.ServiceInfo'
+        type: object
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
   http.ErrorResponse:
     properties:
       error:
@@ -27,11 +38,6 @@ definitions:
             type: string
         type: object
     type: object
-  http.HealthResponse:
-    properties:
-      status:
-        type: string
-    type: object
   http.LoginRequest:
     properties:
       email:
@@ -43,6 +49,14 @@ definitions:
     required:
     - email
     - password
+    type: object
+  http.RefreshRequest:
+    properties:
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    required:
+    - refresh_token
     type: object
   http.RegisterRequest:
     properties:
@@ -57,7 +71,14 @@ definitions:
     - email
     - password
     type: object
-host: localhost:8080
+  http.ServiceInfo:
+    properties:
+      message:
+        type: string
+      status:
+        type: string
+    type: object
+host: strive-api-zjtl.onrender.com
 info:
   contact:
     email: support@swagger.io
@@ -99,6 +120,36 @@ paths:
           schema:
             $ref: '#/definitions/http.ErrorResponse'
       summary: Login user
+      tags:
+      - authentication
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh access token using refresh token
+      parameters:
+      - description: Refresh token data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token refreshed successfully
+          schema:
+            $ref: '#/definitions/http.AuthResponse'
+        "400":
+          description: Invalid request data
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "401":
+          description: Invalid refresh token
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Refresh access token
       tags:
       - authentication
   /api/v1/auth/register:
@@ -143,8 +194,46 @@ paths:
         "200":
           description: API is healthy
           schema:
-            $ref: '#/definitions/http.HealthResponse'
+            $ref: '#/definitions/http.DetailedHealthResponse'
       summary: Health check
+      tags:
+      - system
+  /health/db:
+    get:
+      consumes:
+      - application/json
+      description: Check if the database is accessible
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Database is healthy
+          schema:
+            $ref: '#/definitions/http.DetailedHealthResponse'
+        "503":
+          description: Database is unhealthy
+          schema:
+            $ref: '#/definitions/http.DetailedHealthResponse'
+      summary: Database health check
+      tags:
+      - system
+  /health/detailed:
+    get:
+      consumes:
+      - application/json
+      description: Check all system components
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All systems healthy
+          schema:
+            $ref: '#/definitions/http.DetailedHealthResponse'
+        "503":
+          description: Some systems unhealthy
+          schema:
+            $ref: '#/definitions/http.DetailedHealthResponse'
+      summary: Detailed health check
       tags:
       - system
 schemes:

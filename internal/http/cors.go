@@ -15,6 +15,7 @@ func NewCORSMiddleware() func(http.Handler) http.Handler {
 			"http://127.0.0.1:3000",
 			"http://127.0.0.1:3001",
 			"http://127.0.0.1:4200",
+			"https://satanlittlehelper.github.io",
 		},
 		AllowedMethods: []string{
 			http.MethodGet,
