@@ -42,3 +42,8 @@ func (m *MockAuthService) VerifyPassword(hashedPassword, password string) error 
 	args := m.Called(hashedPassword, password)
 	return args.Error(0)
 }
+
+func (m *MockAuthService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+	args := m.Called(ctx, refreshToken)
+	return args.String(0), args.String(1), args.Error(2)
+}

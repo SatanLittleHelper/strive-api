@@ -15,6 +15,7 @@ import (
 type AuthService interface {
 	Register(ctx context.Context, req *models.CreateUserRequest) (*models.User, error)
 	Login(ctx context.Context, email, password string) (string, string, error)
+	RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
 	ValidateToken(tokenString string) (*Claims, error)
 	HashPassword(password string) (string, error)
 	VerifyPassword(hashedPassword, password string) error
@@ -89,6 +90,30 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	}
 
 	return accessToken, refreshToken, nil
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+	claims, err := s.ValidateToken(refreshToken)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid refresh token")
+	}
+
+	user, err := s.userRepo.GetByID(ctx, claims.UserID)
+	if err != nil {
+		return "", "", fmt.Errorf("user not found")
+	}
+
+	accessToken, err := s.generateToken(user, s.accessTTL)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	newRefreshToken, err := s.generateToken(user, s.refreshTTL)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	return accessToken, newRefreshToken, nil
 }
 
 func (s *authService) ValidateToken(tokenString string) (*Claims, error) {
