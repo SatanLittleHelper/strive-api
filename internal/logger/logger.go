@@ -13,6 +13,10 @@ type Logger struct {
 	*slog.Logger
 }
 
+type contextKey string
+
+const loggerKey contextKey = "logger"
+
 func New(level, format string) *Logger {
 	var logLevel slog.Level
 	switch strings.ToUpper(level) {
@@ -29,7 +33,7 @@ func New(level, format string) *Logger {
 	}
 
 	var handler slog.Handler
-	if strings.ToLower(format) == "json" {
+	if strings.EqualFold(format, "json") {
 		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: logLevel,
 		})
@@ -50,7 +54,7 @@ func (l *Logger) WithRequestID(requestID string) *Logger {
 	}
 }
 
-func (l *Logger) LogRequest(method, path string, statusCode int, duration string, requestID string) {
+func (l *Logger) LogRequest(method, path string, statusCode int, duration, requestID string) {
 	l.WithRequestID(requestID).Info("HTTP request",
 		"method", method,
 		"path", path,
@@ -59,7 +63,7 @@ func (l *Logger) LogRequest(method, path string, statusCode int, duration string
 	)
 }
 
-func (l *Logger) LogError(err error, msg string, requestID string) {
+func (l *Logger) LogError(err error, msg, requestID string) {
 	l.WithRequestID(requestID).Error(msg, "error", err.Error())
 }
 
@@ -88,12 +92,12 @@ func (l *Logger) LogStructured(level, message string, fields map[string]interfac
 }
 
 func FromContext(ctx context.Context) *Logger {
-	if logger, ok := ctx.Value("logger").(*Logger); ok {
+	if logger, ok := ctx.Value(loggerKey).(*Logger); ok {
 		return logger
 	}
 	return New("INFO", "json")
 }
 
 func WithContext(ctx context.Context, logger *Logger) context.Context {
-	return context.WithValue(ctx, "logger", logger)
+	return context.WithValue(ctx, loggerKey, logger)
 }

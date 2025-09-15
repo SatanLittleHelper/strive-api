@@ -100,7 +100,7 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 		h.securityLogger.LogInvalidInput(r, errorMessages)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(validationErrors.ToJSON())
+		_ = json.NewEncoder(w).Encode(validationErrors.ToJSON())
 		return
 	}
 
@@ -120,7 +120,7 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "User registered successfully",
 		"user_id": user.ID,
 	})
@@ -169,7 +169,7 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		h.securityLogger.LogInvalidInput(r, errorMessages)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(validationErrors.ToJSON())
+		_ = json.NewEncoder(w).Encode(validationErrors.ToJSON())
 		return
 	}
 
@@ -186,13 +186,13 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 	response := AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresIn:    900, // 15 minutes
+		ExpiresIn:    900,
 		TokenType:    "Bearer",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // Refresh godoc
@@ -234,11 +234,11 @@ func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
 	response := AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresIn:    900, // 15 minutes
+		ExpiresIn:    900,
 		TokenType:    "Bearer",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }

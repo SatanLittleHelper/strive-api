@@ -10,8 +10,10 @@ import (
 
 type contextKey string
 
-const UserIDKey contextKey = "user_id"
-const UserEmailKey contextKey = "user_email"
+const (
+	UserIDKey    contextKey = "user_id"
+	UserEmailKey contextKey = "user_email"
+)
 
 func AuthMiddleware(authService services.AuthService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

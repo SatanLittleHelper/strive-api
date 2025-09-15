@@ -31,13 +31,13 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 		assert.Equal(t, email, ctxEmail)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	middleware := AuthMiddleware(mockService)
 	wrappedHandler := middleware(handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
@@ -61,7 +61,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	middleware := AuthMiddleware(mockService)
 	wrappedHandler := middleware(handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
@@ -81,7 +81,7 @@ func TestAuthMiddleware_MissingToken(t *testing.T) {
 	middleware := AuthMiddleware(mockService)
 	wrappedHandler := middleware(handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	rr := httptest.NewRecorder()
 
 	wrappedHandler.ServeHTTP(rr, req)
@@ -99,7 +99,7 @@ func TestAuthMiddleware_InvalidFormat(t *testing.T) {
 	middleware := AuthMiddleware(mockService)
 	wrappedHandler := middleware(handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	req.Header.Set("Authorization", "InvalidFormat token")
 	rr := httptest.NewRecorder()
 
@@ -118,7 +118,7 @@ func TestAuthMiddleware_EmptyToken(t *testing.T) {
 	middleware := AuthMiddleware(mockService)
 	wrappedHandler := middleware(handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	req.Header.Set("Authorization", "Bearer ")
 	rr := httptest.NewRecorder()
 
@@ -148,13 +148,13 @@ func TestAuthMiddleware_ContextValues(t *testing.T) {
 		capturedEmail = ctx.Value(UserEmailKey).(string)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	middleware := AuthMiddleware(mockService)
 	wrappedHandler := middleware(handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req := httptest.NewRequest(http.MethodGet, "/protected", http.NoBody)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 

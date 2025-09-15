@@ -10,6 +10,10 @@ import (
 	"github.com/google/uuid"
 )
 
+type requestIDKeyType string
+
+const requestIDKey requestIDKeyType = "request_id"
+
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
@@ -60,7 +64,7 @@ func RequestIDMiddleware() func(http.Handler) http.Handler {
 				requestID = uuid.New().String()
 			}
 
-			ctx := context.WithValue(r.Context(), "request_id", requestID)
+			ctx := context.WithValue(r.Context(), requestIDKey, requestID)
 			w.Header().Set("X-Request-ID", requestID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

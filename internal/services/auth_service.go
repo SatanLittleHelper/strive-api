@@ -103,7 +103,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 		return "", "", fmt.Errorf("user not found")
 	}
 
-	newAccessToken, err := s.generateToken(user, s.accessTTL)
+	accessToken, err := s.generateToken(user, s.accessTTL)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -113,7 +113,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 		return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	return newAccessToken, newRefreshToken, nil
+	return accessToken, newRefreshToken, nil
 }
 
 func (s *authService) ValidateToken(tokenString string) (*Claims, error) {
@@ -123,7 +123,6 @@ func (s *authService) ValidateToken(tokenString string) (*Claims, error) {
 		}
 		return []byte(s.jwtSecret), nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
