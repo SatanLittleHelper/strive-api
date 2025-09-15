@@ -1,121 +1,57 @@
 run:
   timeout: 5m
   tests: true
-
-linters:
-  enable:
-    - gosimple
-    - govet
-    - staticcheck
-    - gofumpt
-    - revive
-    - misspell
-  disable:
-    - errcheck
+  modules-download-mode: readonly
 
 linters-settings:
   gofumpt:
     extra-rules: true
-  revive:
-    severity: warning
-    rules:
-      - name: exported
-        arguments: ["disable"]
-  misspell:
-    locale: US
-
-issues:
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
-
-run:
-  timeout: 5m
-  modules-download-mode: readonly
-
-linters-settings:
-  govet:
-    check-shadowing: true
-  gocyclo:
-    min-complexity: 15
-  maligned:
-    suggest-new: true
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 2
-    min-occurrences: 2
   misspell:
     locale: US
   lll:
     line-length: 140
-  unused:
-    check-exported: false
-  unparam:
-    check-exported: false
-  nakedret:
-    max-func-lines: 30
-  prealloc:
-    simple: true
-    range-loops: true
-    for-loops: false
+  gocyclo:
+    min-complexity: 15
   gocritic:
     enabled-tags:
       - diagnostic
-      - experimental
-      - opinionated
       - performance
       - style
+      - opinionated
+      - experimental
     disabled-checks:
       - dupImport
       - ifElseChain
       - octalLiteral
       - whyNoLint
       - wrapperFunc
+  revive:
+    severity: warning
 
 linters:
   enable:
-    - bodyclose
-    - deadcode
-    - depguard
-    - dogsled
-    - dupl
+    - govet
+    - staticcheck
+    - gosimple
+    - gofumpt
+    - revive
+    - misspell
     - errcheck
-    - exportloopref
-    - exhaustive
-    - funlen
-    - gochecknoinits
-    - goconst
+    - ineffassign
+    - goimports
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
-    - golint
-    - gomnd
-    - goprintffuncname
-    - gosec
-    - gosimple
-    - govet
-    - ineffassign
+    - gochecknoinits
+    - goconst
     - lll
-    - misspell
     - nakedret
     - noctx
-    - nolintlint
     - rowserrcheck
-    - staticcheck
-    - structcheck
-    - stylecheck
     - typecheck
-    - unconvert
     - unparam
     - unused
-    - varcheck
-    - whitespace
 
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gomnd
-        - funlen
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
