@@ -19,7 +19,7 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:8080",
+    "host": "strive-api-zjtl.onrender.com",
     "basePath": "/",
     "paths": {
         "/api/v1/auth/login": {
@@ -61,6 +61,52 @@
                     },
                     "401": {
                         "description": "Invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "description": "Refresh access token using refresh token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Refresh access token",
+                "parameters": [
+                    {
+                        "description": "Refresh token data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.RefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token refreshed successfully",
+                        "schema": {
+                            "$ref": "#/definitions/http.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid refresh token",
                         "schema": {
                             "$ref": "#/definitions/http.ErrorResponse"
                         }
@@ -132,7 +178,65 @@
                     "200": {
                         "description": "API is healthy",
                         "schema": {
-                            "$ref": "#/definitions/http.HealthResponse"
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/db": {
+            "get": {
+                "description": "Check if the database is accessible",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Database health check",
+                "responses": {
+                    "200": {
+                        "description": "Database is healthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Database is unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/detailed": {
+            "get": {
+                "description": "Check all system components",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Detailed health check",
+                "responses": {
+                    "200": {
+                        "description": "All systems healthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Some systems unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
                         }
                     }
                 }
@@ -161,6 +265,23 @@
                 }
             }
         },
+        "http.DetailedHealthResponse": {
+            "type": "object",
+            "properties": {
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/http.ServiceInfo"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "http.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -176,14 +297,6 @@
                             "example": "Invalid input data"
                         }
                     }
-                }
-            }
-        },
-        "http.HealthResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string"
                 }
             }
         },
@@ -204,6 +317,18 @@
                 }
             }
         },
+        "http.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+            }
+        },
         "http.RegisterRequest": {
             "type": "object",
             "required": [
@@ -219,6 +344,17 @@
                     "type": "string",
                     "minLength": 8,
                     "example": "password123"
+                }
+            }
+        },
+        "http.ServiceInfo": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         }

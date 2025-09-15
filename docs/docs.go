@@ -70,6 +70,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "description": "Refresh access token using refresh token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Refresh access token",
+                "parameters": [
+                    {
+                        "description": "Refresh token data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.RefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token refreshed successfully",
+                        "schema": {
+                            "$ref": "#/definitions/http.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid refresh token",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/register": {
             "post": {
                 "description": "Create a new user account with email and password",
@@ -134,7 +180,65 @@ const docTemplate = `{
                     "200": {
                         "description": "API is healthy",
                         "schema": {
-                            "$ref": "#/definitions/http.HealthResponse"
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/db": {
+            "get": {
+                "description": "Check if the database is accessible",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Database health check",
+                "responses": {
+                    "200": {
+                        "description": "Database is healthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Database is unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/detailed": {
+            "get": {
+                "description": "Check all system components",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Detailed health check",
+                "responses": {
+                    "200": {
+                        "description": "All systems healthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Some systems unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
                         }
                     }
                 }
@@ -163,6 +267,23 @@ const docTemplate = `{
                 }
             }
         },
+        "http.DetailedHealthResponse": {
+            "type": "object",
+            "properties": {
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/http.ServiceInfo"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "http.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -178,14 +299,6 @@ const docTemplate = `{
                             "example": "Invalid input data"
                         }
                     }
-                }
-            }
-        },
-        "http.HealthResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string"
                 }
             }
         },
@@ -206,6 +319,18 @@ const docTemplate = `{
                 }
             }
         },
+        "http.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+            }
+        },
         "http.RegisterRequest": {
             "type": "object",
             "required": [
@@ -223,6 +348,17 @@ const docTemplate = `{
                     "example": "password123"
                 }
             }
+        },
+        "http.ServiceInfo": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -238,7 +374,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8080",
+	Host:             "strive-api-zjtl.onrender.com",
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "Strive API",
