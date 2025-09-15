@@ -125,6 +125,7 @@ func setupPublicRoutes(mux *http.ServeMux, handlers *Handlers) {
 	// Auth endpoints
 	mux.HandleFunc("/api/v1/auth/register", handlers.Auth.Register)
 	mux.HandleFunc("/api/v1/auth/login", handlers.Auth.Login)
+	mux.HandleFunc("/api/v1/auth/refresh", handlers.Auth.Refresh)
 
 	// Documentation
 	mux.HandleFunc("/swagger/", httpSwagger.WrapHandler)
