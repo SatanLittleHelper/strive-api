@@ -8,10 +8,11 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig
-	Log    LogConfig
-	DB     DatabaseConfig
-	JWT    JWTConfig
+	Server    ServerConfig
+	Log       LogConfig
+	DB        DatabaseConfig
+	JWT       JWTConfig
+	RateLimit RateLimitConfig
 }
 
 type ServerConfig struct {
@@ -44,6 +45,13 @@ type JWTConfig struct {
 	ClockSkew time.Duration
 }
 
+type RateLimitConfig struct {
+	AuthRequestsPerMinute    int
+	GeneralRequestsPerMinute int
+	BurstSize                int
+	Enabled                  bool
+}
+
 func Load() (*Config, error) {
 	config := &Config{
 		Server: ServerConfig{
@@ -67,10 +75,16 @@ func Load() (*Config, error) {
 			MinConns: int32(getEnvInt("DB_MIN_CONNS", 5)),
 		},
 		JWT: JWTConfig{
-			Secret:    getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+			Secret:    getEnv("JWT_SECRET", ""),
 			Issuer:    getEnv("JWT_ISSUER", "strive-api"),
 			Audience:  getEnv("JWT_AUDIENCE", "strive-app"),
 			ClockSkew: getEnvDuration("JWT_CLOCK_SKEW", 2*time.Minute),
+		},
+		RateLimit: RateLimitConfig{
+			AuthRequestsPerMinute:    getEnvInt("RATE_LIMIT_AUTH_PER_MINUTE", 5),
+			GeneralRequestsPerMinute: getEnvInt("RATE_LIMIT_GENERAL_PER_MINUTE", 60),
+			BurstSize:                getEnvInt("RATE_LIMIT_BURST_SIZE", 10),
+			Enabled:                  getEnv("RATE_LIMIT_ENABLED", "true") == "true",
 		},
 	}
 
