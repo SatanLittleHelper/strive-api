@@ -60,10 +60,12 @@ func (c *Config) Validate() error {
 **Риск**: Атаки на подбор паролей, DoS атаки
 
 **Решение**:
-- [ ] Создать rate limiting middleware
-- [ ] Настроить разные лимиты для разных эндпоинтов
-- [ ] Добавить конфигурацию через ENV переменные
-- [ ] Интегрировать с SecurityLogger
+- [x] Создать rate limiting middleware
+- [x] Настроить разные лимиты для разных эндпоинтов
+- [x] Добавить конфигурацию через ENV переменные
+- [x] Интегрировать с SecurityLogger
+
+**Статус**: ✅ **ВЫПОЛНЕНО** - Коммит: `7395654`, Ветка: `security/add-rate-limiting-middleware`
 
 **Файлы для создания**:
 - `internal/http/rate_limit_middleware.go`
