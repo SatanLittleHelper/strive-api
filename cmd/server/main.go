@@ -50,7 +50,7 @@ func main() {
 	handlers := setupHandlers(authService, logger, db)
 
 	// Setup routes and middleware
-	handler := setupRoutes(handlers, logger, authService)
+	handler := setupRoutes(handlers, logger, authService, cfg)
 
 	// Start server
 	server := httphandler.NewServer(cfg, handler, logger)
@@ -104,7 +104,7 @@ func setupHandlers(authService services.AuthService, logger *logger.Logger, db *
 	}
 }
 
-func setupRoutes(handlers *Handlers, logger *logger.Logger, authService services.AuthService) http.Handler {
+func setupRoutes(handlers *Handlers, logger *logger.Logger, authService services.AuthService, cfg *config.Config) http.Handler {
 	mux := http.NewServeMux()
 
 	// Setup public routes
@@ -114,7 +114,7 @@ func setupRoutes(handlers *Handlers, logger *logger.Logger, authService services
 	setupProtectedRoutes(mux, authService, logger)
 
 	// Apply middleware
-	return applyMiddleware(mux, logger)
+	return applyMiddleware(mux, logger, cfg)
 }
 
 func setupPublicRoutes(mux *http.ServeMux, handlers *Handlers) {
@@ -163,12 +163,15 @@ func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, 
 	mux.Handle("/api/v1/user/", http.StripPrefix("/api/v1/user", protectedHandler))
 }
 
-func applyMiddleware(mux *http.ServeMux, logger *logger.Logger) http.Handler {
+func applyMiddleware(mux *http.ServeMux, logger *logger.Logger, cfg *config.Config) http.Handler {
 	corsMiddleware := httphandler.NewCORSMiddleware()
+	rateLimiter := httphandler.NewRateLimiter(&cfg.RateLimit, logger)
 
 	return corsMiddleware(
-		httphandler.LoggingMiddleware(logger)(
-			httphandler.RequestIDMiddleware()(mux),
+		rateLimiter.RateLimitMiddleware()(
+			httphandler.LoggingMiddleware(logger)(
+				httphandler.RequestIDMiddleware()(mux),
+			),
 		),
 	)
 }
