@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,8 @@ func newMockUserRepository() *mockUserRepository {
 }
 
 func (m *mockUserRepository) Create(ctx context.Context, user *models.User) error {
-	m.users[user.Email] = user
+	normalizedEmail := strings.ToLower(strings.TrimSpace(user.Email))
+	m.users[normalizedEmail] = user
 	return nil
 }
 
@@ -36,14 +38,16 @@ func (m *mockUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 }
 
 func (m *mockUserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
-	if user, exists := m.users[email]; exists {
+	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
+	if user, exists := m.users[normalizedEmail]; exists {
 		return user, nil
 	}
 	return nil, fmt.Errorf("user not found")
 }
 
 func (m *mockUserRepository) Update(ctx context.Context, user *models.User) error {
-	m.users[user.Email] = user
+	normalizedEmail := strings.ToLower(strings.TrimSpace(user.Email))
+	m.users[normalizedEmail] = user
 	return nil
 }
 
@@ -114,6 +118,41 @@ func TestAuthService_Login(t *testing.T) {
 	accessToken, refreshToken, err := authService.Login(context.Background(), req.Email, req.Password)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if accessToken == "" {
+		t.Error("Access token should not be empty")
+	}
+
+	if refreshToken == "" {
+		t.Error("Refresh token should not be empty")
+	}
+}
+
+func TestAuthService_LoginCaseInsensitive(t *testing.T) {
+	mockRepo := newMockUserRepository()
+	jwtConfig := &config.JWTConfig{
+		Secret:    "test-secret",
+		Issuer:    "test-issuer",
+		Audience:  "test-audience",
+		ClockSkew: 1 * time.Minute,
+	}
+	authService := NewAuthService(mockRepo, jwtConfig)
+
+	// Register user with lowercase email
+	req := &models.CreateUserRequest{
+		Email:    "test@example.com",
+		Password: "password123",
+	}
+	_, err := authService.Register(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Failed to register user: %v", err)
+	}
+
+	// Try to login with different case email
+	accessToken, refreshToken, err := authService.Login(context.Background(), "Test@Example.com", req.Password)
+	if err != nil {
+		t.Fatalf("Expected no error with different case email, got %v", err)
 	}
 
 	if accessToken == "" {
