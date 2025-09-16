@@ -33,8 +33,14 @@ func TestJWTSecretValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("JWT_SECRET", tt.jwtSecret)
-			defer os.Unsetenv("JWT_SECRET")
+			if err := os.Setenv("JWT_SECRET", tt.jwtSecret); err != nil {
+				t.Fatalf("Failed to set JWT_SECRET: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("JWT_SECRET"); err != nil {
+					t.Errorf("Failed to unset JWT_SECRET: %v", err)
+				}
+			}()
 
 			config, err := Load()
 
@@ -59,8 +65,14 @@ func TestJWTSecretValidation(t *testing.T) {
 }
 
 func TestConfigValidation(t *testing.T) {
-	os.Setenv("JWT_SECRET", "this-is-a-very-long-and-secure-secret-key-for-jwt-tokens")
-	defer os.Unsetenv("JWT_SECRET")
+	if err := os.Setenv("JWT_SECRET", "this-is-a-very-long-and-secure-secret-key-for-jwt-tokens"); err != nil {
+		t.Fatalf("Failed to set JWT_SECRET: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("JWT_SECRET"); err != nil {
+			t.Errorf("Failed to unset JWT_SECRET: %v", err)
+		}
+	}()
 
 	config, err := Load()
 	if err != nil {
