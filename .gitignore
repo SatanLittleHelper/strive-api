@@ -10,4 +10,15 @@ vendor/
 .idea/
 .vscode/
 
+# Build artifacts
+server
+http.test
+coverage.html
+coverage.out
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
 
