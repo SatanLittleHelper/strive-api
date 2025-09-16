@@ -38,7 +38,10 @@ type DatabaseConfig struct {
 }
 
 type JWTConfig struct {
-	Secret string
+	Secret    string
+	Issuer    string
+	Audience  string
+	ClockSkew time.Duration
 }
 
 func Load() (*Config, error) {
@@ -64,7 +67,10 @@ func Load() (*Config, error) {
 			MinConns: int32(getEnvInt("DB_MIN_CONNS", 5)),
 		},
 		JWT: JWTConfig{
-			Secret: getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+			Secret:    getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+			Issuer:    getEnv("JWT_ISSUER", "strive-api"),
+			Audience:  getEnv("JWT_AUDIENCE", "strive-app"),
+			ClockSkew: getEnvDuration("JWT_CLOCK_SKEW", 2*time.Minute),
 		},
 	}
 

@@ -15,6 +15,9 @@ run-dev:
 	DB_NAME=strive \
 	DB_SSL_MODE=disable \
 	JWT_SECRET=dev-secret-key-12345 \
+	JWT_ISSUER=strive-api \
+	JWT_AUDIENCE=strive-app \
+	JWT_CLOCK_SKEW=2m \
 	go run ./cmd/server
 
 db-up:

@@ -1,0 +1,345 @@
+# Strive API - Архитектура Проекта
+
+## Обзор
+
+Strive API - это REST API для приложения дневника тренировок, построенное на Go с использованием чистой архитектуры. Проект реализует аутентификацию на JWT токенах и следует принципам DDD (Domain-Driven Design).
+
+## Технологический Стек
+
+- **Язык**: Go 1.25.1
+- **База данных**: PostgreSQL с драйвером pgx/v5
+- **Аутентификация**: JWT токены (golang-jwt/jwt/v5)
+- **Хеширование паролей**: bcrypt
+- **Миграции**: golang-migrate/v4
+- **Тестирование**: testify/v1.10.0
+- **Документация**: Swagger/OpenAPI
+- **Логирование**: Структурированное JSON логирование
+- **Контейнеризация**: Docker + Docker Compose
+
+## Структура Проекта
+
+```
+strive-api/
+├── cmd/server/           # Точка входа приложения
+│   └── main.go          # Главный файл с bootstrap логикой
+├── internal/            # Приватные пакеты приложения
+│   ├── config/          # Конфигурация
+│   ├── database/        # Подключение к БД
+│   ├── http/            # HTTP слой (handlers, middleware)
+│   ├── logger/          # Логирование
+│   ├── migrate/         # Миграции БД
+│   ├── models/          # Доменные модели
+│   ├── repositories/    # Слой доступа к данным
+│   ├── services/        # Бизнес-логика
+│   └── validation/      # Валидация входных данных
+├── migrations/          # SQL миграции
+├── docs/               # Документация и планы
+└── pkg/                # Публичные библиотеки (пока не используется)
+```
+
+## Архитектурные Принципы
+
+### Clean Architecture Layers
+
+1. **Entities (models/)** - Доменные модели
+2. **Use Cases (services/)** - Бизнес-логика
+3. **Interface Adapters (repositories/, http/)** - Адаптеры интерфейсов
+4. **Frameworks & Drivers (database/, config/)** - Внешние зависимости
+
+### Dependency Injection
+
+Все зависимости инъектируются через конструкторы, глобальное состояние избегается.
+
+### Error Handling
+
+- Структурированные ошибки с контекстом
+- Логирование всех ошибок
+- Консистентные API ответы
+
+## Ключевые Компоненты
+
+### 1. Конфигурация (internal/config/)
+
+**Файл**: `config.go`
+
+Централизованное управление конфигурацией через переменные окружения:
+
+- **ServerConfig**: Настройки HTTP сервера (порт, таймауты)
+- **LogConfig**: Настройки логирования (уровень, формат)
+- **DatabaseConfig**: Параметры подключения к БД
+- **JWTConfig**: Секрет для JWT токенов
+
+**Особенности**:
+- Валидация всех параметров конфигурации
+- Значения по умолчанию для разработки
+- Типизированная конфигурация
+
+### 2. База Данных (internal/database/)
+
+**Файл**: `database.go`
+
+Подключение к PostgreSQL с использованием connection pool:
+
+- pgx/v5 драйвер для производительности
+- Пул соединений с настраиваемыми лимитами
+- Graceful shutdown
+- Health checks
+
+### 3. HTTP Слой (internal/http/)
+
+#### Server (server.go)
+- HTTP сервер с graceful shutdown
+- Настраиваемые таймауты
+- Обработка сигналов прерывания
+
+#### Handlers
+- **AuthHandlers**: Регистрация, авторизация, обновление токенов
+- **HealthHandlers**: Проверка состояния приложения и БД
+
+#### Middleware
+- **AuthMiddleware**: Расширенная проверка JWT токенов с детальными ошибками
+- **LoggingMiddleware**: Логирование запросов
+- **RequestIDMiddleware**: Трассировка запросов
+- **CORSMiddleware**: CORS политики
+- **SecurityMiddleware**: Безопасность (rate limiting, etc.)
+
+### 4. Модели (internal/models/)
+
+**Файл**: `user.go`
+
+Доменные модели с JSON и DB тегами:
+
+```go
+type User struct {
+    ID           uuid.UUID `json:"id" db:"id"`
+    Email        string    `json:"email" db:"email"`
+    PasswordHash string    `json:"-" db:"password_hash"`
+    CreatedAt    time.Time `json:"created_at" db:"created_at"`
+    UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+}
+```
+
+**Request/Response модели**:
+- CreateUserRequest
+- UpdateUserRequest
+- ChangePasswordRequest
+
+### 5. Сервисы (internal/services/)
+
+**Файл**: `auth_service.go`
+
+Бизнес-логика аутентификации:
+
+```go
+type AuthService interface {
+    Register(ctx context.Context, req *models.CreateUserRequest) (*models.User, error)
+    Login(ctx context.Context, email, password string) (string, string, error)
+    RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
+    ValidateToken(tokenString string) (*Claims, error)
+    HashPassword(password string) (string, error)
+    VerifyPassword(hashedPassword, password string) error
+}
+```
+
+**Функциональность**:
+- Регистрация пользователей с валидацией уникальности email
+- Аутентификация с bcrypt хешированием
+- JWT токены (access + refresh) с расширенной валидацией
+- Валидация токенов с проверкой iss/aud/clock skew
+- Специфичные ошибки валидации (ErrTokenExpired, ErrInvalidIssuer, etc.)
+
+### 6. Репозитории (internal/repositories/)
+
+**Файл**: `user_repository.go`
+
+Слой доступа к данным:
+
+```go
+type UserRepository interface {
+    Create(ctx context.Context, user *models.User) error
+    GetByID(ctx context.Context, id uuid.UUID) (*models.User, error)
+    GetByEmail(ctx context.Context, email string) (*models.User, error)
+    Update(ctx context.Context, user *models.User) error
+    Delete(ctx context.Context, id uuid.UUID) error
+}
+```
+
+**Особенности**:
+- Подготовленные SQL запросы
+- Context для отмены операций
+- Обработка ошибок БД
+
+### 7. Валидация (internal/validation/)
+
+**Файл**: `validator.go`
+
+Валидация входных данных:
+- Email валидация
+- Пароль валидация (минимум 8 символов)
+- Структурированные ошибки валидации
+
+### 8. Логирование (internal/logger/)
+
+**Файл**: `logger.go`
+
+Структурированное логирование:
+- JSON формат для production
+- Настраиваемые уровни
+- Контекстные поля
+- Security логирование
+
+### 9. Миграции (internal/migrate/)
+
+**Файл**: `migrate.go`
+
+Управление схемой БД:
+- Автоматический запуск миграций при старте
+- Поддержка up/down миграций
+- Версионирование схемы
+
+## API Endpoints
+
+### Публичные эндпоинты:
+
+```
+GET  /health                    - Базовая проверка здоровья
+GET  /health/db                 - Проверка подключения к БД
+GET  /health/detailed           - Детальная информация о состоянии
+POST /api/v1/auth/register      - Регистрация пользователя
+POST /api/v1/auth/login         - Авторизация пользователя
+POST /api/v1/auth/refresh       - Обновление JWT токена
+GET  /swagger/                  - Swagger документация
+```
+
+### Защищенные эндпоинты:
+
+```
+GET  /api/v1/user/profile       - Профиль пользователя (пример)
+```
+
+## Конфигурация через ENV
+
+Основные переменные окружения:
+
+```bash
+# Сервер
+PORT=8080
+SERVER_READ_TIMEOUT=10s
+SERVER_WRITE_TIMEOUT=10s
+SERVER_IDLE_TIMEOUT=60s
+
+# Логирование
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+
+# База данных
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=password
+DB_NAME=strive
+DB_SSL_MODE=disable
+DB_MAX_CONNS=25
+DB_MIN_CONNS=5
+
+# JWT
+JWT_SECRET=your-secret-key-change-in-production
+```
+
+## Тестирование
+
+### Структура тестов:
+- Unit тесты для каждого слоя
+- Моки для внешних зависимостей
+- Integration тесты для API endpoints
+
+### Команды:
+```bash
+make test              # Все тесты
+make test-unit         # Unit тесты
+make test-coverage     # Тесты с покрытием
+```
+
+## Развертывание
+
+### Docker:
+```bash
+make docker-up         # Запуск с Docker Compose
+make docker-build      # Сборка образа
+```
+
+### Локальная разработка:
+```bash
+make db-up             # Запуск PostgreSQL
+make run-dev           # Запуск с dev окружением
+```
+
+## Безопасность
+
+### Реализованные меры:
+- JWT токены для аутентификации с расширенной валидацией
+- bcrypt для хеширования паролей
+- CORS middleware
+- Request ID для трассировки
+- Структурированное логирование инцидентов безопасности
+- Валидация всех входных данных
+- Проверка iss/aud в JWT токенах
+- Clock skew для синхронизации времени
+- Детальные коды ошибок аутентификации
+
+### Планируемые улучшения:
+- Rate limiting
+- Request size limits
+- Input sanitization
+- SQL injection protection (уже частично через pgx)
+
+## Мониторинг и Наблюдаемость
+
+### Health Checks:
+- Базовая проверка приложения
+- Проверка подключения к БД
+- Детальная информация о состоянии системы
+
+### Логирование:
+- Структурированные JSON логи
+- Трассировка запросов через Request ID
+- Логирование ошибок и инцидентов безопасности
+
+## Правила Разработки
+
+### Код Style:
+- gofumpt для форматирования
+- goimports для импортов
+- golangci-lint для статического анализа
+
+### Коммиты:
+- Префикс с названием ветки
+- Present tense, краткие сообщения (<72 символов)
+
+### Тестирование:
+- Headless режим
+- Race detection
+- Timeout 60s
+- Неинтерактивные тесты
+
+### Архитектурные принципы:
+- Explicit return types
+- No global state
+- Dependency injection через конструкторы
+- Context.Context для request-scoped данных
+- Thin handlers, logic в services
+- Immutable data где возможно
+- Pure functions где практично
+
+## Будущие Улучшения
+
+Согласно планам в `docs/stages/`:
+
+1. **Расширение API**: Добавление эндпоинтов для тренировок, упражнений
+2. **Кеширование**: Redis для улучшения производительности
+3. **Метрики**: Prometheus интеграция
+4. **Тестирование**: Увеличение покрытия тестами
+5. **Документация**: Расширение API документации
+6. **Performance**: Оптимизация запросов к БД
+
+Этот документ служит справочником по архитектуре проекта и должен обновляться при внесении значительных изменений в структуру или подходы.

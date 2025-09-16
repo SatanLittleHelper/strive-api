@@ -2,14 +2,24 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/aleksandr/strive-api/internal/config"
 	"github.com/aleksandr/strive-api/internal/models"
 	"github.com/aleksandr/strive-api/internal/repositories"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+)
+
+var (
+	ErrInvalidSignature = errors.New("invalid token signature")
+	ErrTokenExpired     = errors.New("token has expired")
+	ErrTokenNotBefore   = errors.New("token used before valid")
+	ErrInvalidAudience  = errors.New("invalid token audience")
+	ErrInvalidIssuer    = errors.New("invalid token issuer")
 )
 
 type AuthService interface {
@@ -29,15 +39,15 @@ type Claims struct {
 
 type authService struct {
 	userRepo   repositories.UserRepository
-	jwtSecret  string
+	config     *config.JWTConfig
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 }
 
-func NewAuthService(userRepo repositories.UserRepository, jwtSecret string) AuthService {
+func NewAuthService(userRepo repositories.UserRepository, jwtConfig *config.JWTConfig) AuthService {
 	return &authService{
 		userRepo:   userRepo,
-		jwtSecret:  jwtSecret,
+		config:     jwtConfig,
 		accessTTL:  15 * time.Minute,
 		refreshTTL: 7 * 24 * time.Hour,
 	}
@@ -119,19 +129,51 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 func (s *authService) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			return nil, ErrInvalidSignature
 		}
-		return []byte(s.jwtSecret), nil
-	})
+		return []byte(s.config.Secret), nil
+	}, jwt.WithoutClaimsValidation())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
-		return claims, nil
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims")
 	}
 
-	return nil, fmt.Errorf("invalid token")
+	now := time.Now()
+	clockSkew := s.config.ClockSkew
+
+	if claims.ExpiresAt != nil && now.After(claims.ExpiresAt.Time.Add(clockSkew)) {
+		return nil, ErrTokenExpired
+	}
+
+	if claims.NotBefore != nil && now.Before(claims.NotBefore.Time.Add(-clockSkew)) {
+		return nil, ErrTokenNotBefore
+	}
+
+	if claims.Issuer != s.config.Issuer {
+		return nil, ErrInvalidIssuer
+	}
+
+	audience, err := claims.RegisteredClaims.GetAudience()
+	if err != nil || len(audience) == 0 {
+		return nil, ErrInvalidAudience
+	}
+
+	found := false
+	for _, aud := range audience {
+		if aud == s.config.Audience {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, ErrInvalidAudience
+	}
+
+	return claims, nil
 }
 
 func (s *authService) HashPassword(password string) (string, error) {
@@ -147,16 +189,19 @@ func (s *authService) VerifyPassword(hashedPassword, password string) error {
 }
 
 func (s *authService) generateToken(user *models.User, ttl time.Duration) (string, error) {
+	now := time.Now()
 	claims := &Claims{
 		UserID: user.ID,
 		Email:  user.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    s.config.Issuer,
+			Audience:  jwt.ClaimStrings{s.config.Audience},
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(s.jwtSecret))
+	return token.SignedString([]byte(s.config.Secret))
 }
