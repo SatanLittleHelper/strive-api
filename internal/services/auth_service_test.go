@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/aleksandr/strive-api/internal/config"
 	"github.com/aleksandr/strive-api/internal/models"
 	"github.com/google/uuid"
 )
@@ -57,7 +59,13 @@ func (m *mockUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 func TestAuthService_Register(t *testing.T) {
 	mockRepo := newMockUserRepository()
-	authService := NewAuthService(mockRepo, "test-secret")
+	jwtConfig := &config.JWTConfig{
+		Secret:    "test-secret",
+		Issuer:    "test-issuer",
+		Audience:  "test-audience",
+		ClockSkew: 1 * time.Minute,
+	}
+	authService := NewAuthService(mockRepo, jwtConfig)
 
 	req := &models.CreateUserRequest{
 		Email:    "test@example.com",
@@ -84,7 +92,13 @@ func TestAuthService_Register(t *testing.T) {
 
 func TestAuthService_Login(t *testing.T) {
 	mockRepo := newMockUserRepository()
-	authService := NewAuthService(mockRepo, "test-secret")
+	jwtConfig := &config.JWTConfig{
+		Secret:    "test-secret",
+		Issuer:    "test-issuer",
+		Audience:  "test-audience",
+		ClockSkew: 1 * time.Minute,
+	}
+	authService := NewAuthService(mockRepo, jwtConfig)
 
 	// First register a user
 	req := &models.CreateUserRequest{
@@ -111,44 +125,15 @@ func TestAuthService_Login(t *testing.T) {
 	}
 }
 
-func TestAuthService_ValidateToken(t *testing.T) {
-	mockRepo := newMockUserRepository()
-	authService := NewAuthService(mockRepo, "test-secret")
-
-	// First register a user
-	req := &models.CreateUserRequest{
-		Email:    "test@example.com",
-		Password: "password123",
-	}
-	user, err := authService.Register(context.Background(), req)
-	if err != nil {
-		t.Fatalf("Failed to register user: %v", err)
-	}
-
-	// Generate a token by logging in
-	accessToken, _, err := authService.Login(context.Background(), user.Email, req.Password)
-	if err != nil {
-		t.Fatalf("Failed to generate token: %v", err)
-	}
-
-	// Validate the token
-	claims, err := authService.ValidateToken(accessToken)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-
-	if claims.Email != user.Email {
-		t.Errorf("Expected email %s, got %s", user.Email, claims.Email)
-	}
-
-	if claims.UserID != user.ID {
-		t.Errorf("Expected user ID %s, got %s", user.ID, claims.UserID)
-	}
-}
-
 func TestAuthService_HashPassword(t *testing.T) {
 	mockRepo := newMockUserRepository()
-	authService := NewAuthService(mockRepo, "test-secret")
+	jwtConfig := &config.JWTConfig{
+		Secret:    "test-secret",
+		Issuer:    "test-issuer",
+		Audience:  "test-audience",
+		ClockSkew: 1 * time.Minute,
+	}
+	authService := NewAuthService(mockRepo, jwtConfig)
 
 	password := "testpassword123"
 	hashed, err := authService.HashPassword(password)

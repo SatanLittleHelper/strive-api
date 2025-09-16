@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -87,7 +88,7 @@ func runMigrations(cfg *config.Config, logger *logger.Logger) {
 
 func setupServices(db *database.Database, cfg *config.Config) services.AuthService {
 	userRepo := repositories.NewUserRepository(db.Pool())
-	authService := services.NewAuthService(userRepo, cfg.JWT.Secret)
+	authService := services.NewAuthService(userRepo, &cfg.JWT)
 	return authService
 }
 
@@ -136,18 +137,27 @@ func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, 
 	protectedMux := http.NewServeMux()
 
 	// Protected endpoints
-	protectedMux.HandleFunc("/api/v1/user/profile", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/profile", func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := httphandler.GetUserIDFromContext(r.Context())
+		if !ok {
+			http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
+			return
+		}
+
+		userEmail, _ := httphandler.GetUserEmailFromContext(r.Context())
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"message":"This is a protected endpoint"}`))
+		response := map[string]interface{}{
+			"message": "This is a protected endpoint",
+			"user_id": userID,
+			"email":   userEmail,
+		}
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	// Apply auth middleware to protected routes
-	protectedHandler := httphandler.LoggingMiddleware(logger)(
-		httphandler.RequestIDMiddleware()(
-			httphandler.AuthMiddleware(authService)(protectedMux),
-		),
-	)
+	protectedHandler := httphandler.AuthMiddleware(authService, logger)(protectedMux)
 
 	// Mount protected routes
 	mux.Handle("/api/v1/user/", http.StripPrefix("/api/v1/user", protectedHandler))

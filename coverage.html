@@ -57,27 +57,35 @@
 				
 				<option value="file0">github.com/aleksandr/strive-api/cmd/server/main.go (0.0%)</option>
 				
-				<option value="file1">github.com/aleksandr/strive-api/internal/config/config.go (0.0%)</option>
+				<option value="file1">github.com/aleksandr/strive-api/docs/docs.go (0.0%)</option>
 				
-				<option value="file2">github.com/aleksandr/strive-api/internal/database/database.go (0.0%)</option>
+				<option value="file2">github.com/aleksandr/strive-api/internal/config/config.go (0.0%)</option>
 				
-				<option value="file3">github.com/aleksandr/strive-api/internal/http/auth_handlers.go (80.6%)</option>
+				<option value="file3">github.com/aleksandr/strive-api/internal/database/database.go (0.0%)</option>
 				
-				<option value="file4">github.com/aleksandr/strive-api/internal/http/auth_middleware.go (84.0%)</option>
+				<option value="file4">github.com/aleksandr/strive-api/internal/http/auth_handlers.go (67.5%)</option>
 				
-				<option value="file5">github.com/aleksandr/strive-api/internal/http/handlers.go (100.0%)</option>
+				<option value="file5">github.com/aleksandr/strive-api/internal/http/auth_middleware.go (86.4%)</option>
 				
-				<option value="file6">github.com/aleksandr/strive-api/internal/http/middleware.go (100.0%)</option>
+				<option value="file6">github.com/aleksandr/strive-api/internal/http/cors.go (0.0%)</option>
 				
-				<option value="file7">github.com/aleksandr/strive-api/internal/http/server.go (0.0%)</option>
+				<option value="file7">github.com/aleksandr/strive-api/internal/http/health_handlers.go (7.7%)</option>
 				
-				<option value="file8">github.com/aleksandr/strive-api/internal/logger/logger.go (0.0%)</option>
+				<option value="file8">github.com/aleksandr/strive-api/internal/http/middleware.go (100.0%)</option>
 				
-				<option value="file9">github.com/aleksandr/strive-api/internal/migrate/migrate.go (0.0%)</option>
+				<option value="file9">github.com/aleksandr/strive-api/internal/http/security_middleware.go (35.7%)</option>
 				
-				<option value="file10">github.com/aleksandr/strive-api/internal/repositories/user_repository.go (0.0%)</option>
+				<option value="file10">github.com/aleksandr/strive-api/internal/http/server.go (0.0%)</option>
 				
-				<option value="file11">github.com/aleksandr/strive-api/internal/services/auth_service.go (72.5%)</option>
+				<option value="file11">github.com/aleksandr/strive-api/internal/logger/logger.go (0.0%)</option>
+				
+				<option value="file12">github.com/aleksandr/strive-api/internal/migrate/migrate.go (0.0%)</option>
+				
+				<option value="file13">github.com/aleksandr/strive-api/internal/repositories/user_repository.go (0.0%)</option>
+				
+				<option value="file14">github.com/aleksandr/strive-api/internal/services/auth_service.go (67.1%)</option>
+				
+				<option value="file15">github.com/aleksandr/strive-api/internal/validation/validator.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -103,9 +111,11 @@
 		<pre class="file" id="file0" style="display: none">package main
 
 import (
+        "encoding/json"
         "log"
         "net/http"
 
+        _ "github.com/aleksandr/strive-api/docs"
         "github.com/aleksandr/strive-api/internal/config"
         "github.com/aleksandr/strive-api/internal/database"
         httphandler "github.com/aleksandr/strive-api/internal/http"
@@ -113,69 +123,560 @@ import (
         "github.com/aleksandr/strive-api/internal/migrate"
         "github.com/aleksandr/strive-api/internal/repositories"
         "github.com/aleksandr/strive-api/internal/services"
+        httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// @title Strive API
+// @version 1.0
+// @description API for workout diary with user authentication
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host strive-api-zjtl.onrender.com
+// @BasePath /
+// @schemes http https
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
 func main() <span class="cov0" title="0">{
+        cfg := loadConfig()
+        logger := setupLogger(cfg)
+        db := setupDatabase(cfg, logger)
+        defer db.Close()
+
+        runMigrations(cfg, logger)
+
+        // Initialize services and handlers
+        authService := setupServices(db, cfg)
+        handlers := setupHandlers(authService, logger, db)
+
+        // Setup routes and middleware
+        handler := setupRoutes(handlers, logger, authService)
+
+        // Start server
+        server := httphandler.NewServer(cfg, handler, logger)
+        server.Start()
+        server.WaitForShutdown()
+}</span>
+
+func loadConfig() *config.Config <span class="cov0" title="0">{
         cfg, err := config.Load()
         if err != nil </span><span class="cov0" title="0">{
                 log.Fatalf("Failed to load config: %v", err)
         }</span>
+        <span class="cov0" title="0">return cfg</span>
+}
 
-        <span class="cov0" title="0">logger := logger.New(cfg.Log.Level, cfg.Log.Format)
+func setupLogger(cfg *config.Config) *logger.Logger <span class="cov0" title="0">{
+        logger := logger.New(cfg.Log.Level, cfg.Log.Format)
         logger.Info("Application starting", "config", cfg)
+        return logger
+}</span>
 
-        if err := migrate.Run(cfg, logger); err != nil </span><span class="cov0" title="0">{
-                log.Fatalf("Failed to run migrations: %v", err)
-        }</span>
-
-        <span class="cov0" title="0">db, err := database.New(cfg, logger)
+func setupDatabase(cfg *config.Config, logger *logger.Logger) *database.Database <span class="cov0" title="0">{
+        db, err := database.New(cfg, logger)
         if err != nil </span><span class="cov0" title="0">{
                 log.Fatalf("Failed to connect to database: %v", err)
         }</span>
-        <span class="cov0" title="0">defer db.Close()
+        <span class="cov0" title="0">return db</span>
+}
 
-        // Initialize repositories and services
+func runMigrations(cfg *config.Config, logger *logger.Logger) <span class="cov0" title="0">{
+        if err := migrate.Run(cfg, logger); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("Failed to run migrations: %v", err)
+        }</span>
+}
+
+func setupServices(db *database.Database, cfg *config.Config) services.AuthService <span class="cov0" title="0">{
         userRepo := repositories.NewUserRepository(db.Pool())
-        authService := services.NewAuthService(userRepo, cfg.JWT.Secret)
+        authService := services.NewAuthService(userRepo, &amp;cfg.JWT)
+        return authService
+}</span>
 
-        // Initialize handlers
-        authHandlers := httphandler.NewAuthHandlers(authService, logger)
+type Handlers struct {
+        Auth   *httphandler.AuthHandlers
+        Health *httphandler.DetailedHealthHandler
+}
 
+func setupHandlers(authService services.AuthService, logger *logger.Logger, db *database.Database) *Handlers <span class="cov0" title="0">{
+        return &amp;Handlers{
+                Auth:   httphandler.NewAuthHandlers(authService, logger),
+                Health: httphandler.NewDetailedHealthHandler(logger, db.Pool()),
+        }
+}</span>
+
+func setupRoutes(handlers *Handlers, logger *logger.Logger, authService services.AuthService) http.Handler <span class="cov0" title="0">{
         mux := http.NewServeMux()
 
-        // Public routes
-        mux.HandleFunc("/health", httphandler.HealthHandler)
-        mux.HandleFunc("/api/v1/auth/register", authHandlers.Register)
-        mux.HandleFunc("/api/v1/auth/login", authHandlers.Login)
+        // Setup public routes
+        setupPublicRoutes(mux, handlers)
 
-        // Protected routes (example)
+        // Setup protected routes
+        setupProtectedRoutes(mux, authService, logger)
+
+        // Apply middleware
+        return applyMiddleware(mux, logger)
+}</span>
+
+func setupPublicRoutes(mux *http.ServeMux, handlers *Handlers) <span class="cov0" title="0">{
+        // Health endpoints
+        mux.HandleFunc("/health", handlers.Health.Health)
+        mux.HandleFunc("/health/db", handlers.Health.DatabaseHealth)
+        mux.HandleFunc("/health/detailed", handlers.Health.DetailedHealth)
+
+        // Auth endpoints
+        mux.HandleFunc("/api/v1/auth/register", handlers.Auth.Register)
+        mux.HandleFunc("/api/v1/auth/login", handlers.Auth.Login)
+        mux.HandleFunc("/api/v1/auth/refresh", handlers.Auth.Refresh)
+
+        // Documentation
+        mux.HandleFunc("/swagger/", httpSwagger.WrapHandler)
+}</span>
+
+func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, logger *logger.Logger) <span class="cov0" title="0">{
+        // Create protected sub-router
         protectedMux := http.NewServeMux()
-        protectedMux.HandleFunc("/api/v1/user/profile", func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+
+        // Protected endpoints
+        protectedMux.HandleFunc("/profile", func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+                userID, ok := httphandler.GetUserIDFromContext(r.Context())
+                if !ok </span><span class="cov0" title="0">{
+                        http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
+                        return
+                }</span>
+
+                <span class="cov0" title="0">userEmail, _ := httphandler.GetUserEmailFromContext(r.Context())
+
                 w.Header().Set("Content-Type", "application/json")
                 w.WriteHeader(http.StatusOK)
-                w.Write([]byte(`{"message":"This is a protected endpoint"}`))
-        }</span>)
+                response := map[string]interface{}{
+                        "message": "This is a protected endpoint",
+                        "user_id": userID,
+                        "email":   userEmail,
+                }
+                _ = json.NewEncoder(w).Encode(response)</span>
+        })
 
-        // Apply middleware to protected routes
-        <span class="cov0" title="0">protectedHandler := httphandler.LoggingMiddleware(logger)(
-                httphandler.RequestIDMiddleware()(
-                        httphandler.AuthMiddleware(authService)(protectedMux),
+        // Apply auth middleware to protected routes
+        <span class="cov0" title="0">protectedHandler := httphandler.AuthMiddleware(authService, logger)(protectedMux)
+
+        // Mount protected routes
+        mux.Handle("/api/v1/user/", http.StripPrefix("/api/v1/user", protectedHandler))</span>
+}
+
+func applyMiddleware(mux *http.ServeMux, logger *logger.Logger) http.Handler <span class="cov0" title="0">{
+        corsMiddleware := httphandler.NewCORSMiddleware()
+
+        return corsMiddleware(
+                httphandler.LoggingMiddleware(logger)(
+                        httphandler.RequestIDMiddleware()(mux),
                 ),
         )
-
-        // Combine public and protected routes
-        mux.Handle("/api/v1/user/", http.StripPrefix("/api/v1/user", protectedHandler))
-
-        // Apply middleware to main mux
-        handler := httphandler.LoggingMiddleware(logger)(httphandler.RequestIDMiddleware()(mux))
-
-        server := httphandler.NewServer(cfg, handler, logger)
-        server.Start()
-        server.WaitForShutdown()</span>
-}
+}</span>
 </pre>
 		
-		<pre class="file" id="file1" style="display: none">package config
+		<pre class="file" id="file1" style="display: none">// Package docs Code generated by swaggo/swag. DO NOT EDIT
+package docs
+
+import "github.com/swaggo/swag"
+
+const docTemplate = `{
+    "schemes": {{ marshal .Schemes }},
+    "swagger": "2.0",
+    "info": {
+        "description": "{{escape .Description}}",
+        "title": "{{.Title}}",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "{{.Version}}"
+    },
+    "host": "{{.Host}}",
+    "basePath": "{{.BasePath}}",
+    "paths": {
+        "/api/v1/auth/login": {
+            "post": {
+                "description": "Authenticate user and return JWT tokens",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Login user",
+                "parameters": [
+                    {
+                        "description": "User login credentials",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "schema": {
+                            "$ref": "#/definitions/http.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "description": "Refresh access token using refresh token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Refresh access token",
+                "parameters": [
+                    {
+                        "description": "Refresh token data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.RefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token refreshed successfully",
+                        "schema": {
+                            "$ref": "#/definitions/http.AuthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid refresh token",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/register": {
+            "post": {
+                "description": "Create a new user account with email and password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "User registration data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "User registered successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check if the API is running",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "API is healthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/db": {
+            "get": {
+                "description": "Check if the database is accessible",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Database health check",
+                "responses": {
+                    "200": {
+                        "description": "Database is healthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Database is unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/detailed": {
+            "get": {
+                "description": "Check all system components",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Detailed health check",
+                "responses": {
+                    "200": {
+                        "description": "All systems healthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Some systems unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/http.DetailedHealthResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "http.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "expires_in": {
+                    "type": "integer",
+                    "example": 900
+                },
+                "refresh_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                }
+            }
+        },
+        "http.DetailedHealthResponse": {
+            "type": "object",
+            "properties": {
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/http.ServiceInfo"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "example": "VALIDATION_ERROR"
+                        },
+                        "message": {
+                            "type": "string",
+                            "example": "Invalid input data"
+                        }
+                    }
+                }
+            }
+        },
+        "http.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "password123"
+                }
+            }
+        },
+        "http.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+            }
+        },
+        "http.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "password123"
+                }
+            }
+        },
+        "http.ServiceInfo": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Type \"Bearer\" followed by a space and JWT token.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}`
+
+// SwaggerInfo holds exported Swagger Info so clients can modify it
+var SwaggerInfo = &amp;swag.Spec{
+        Version:          "1.0",
+        Host:             "strive-api-zjtl.onrender.com",
+        BasePath:         "/",
+        Schemes:          []string{"http", "https"},
+        Title:            "Strive API",
+        Description:      "API for workout diary with user authentication",
+        InfoInstanceName: "swagger",
+        SwaggerTemplate:  docTemplate,
+        LeftDelim:        "{{",
+        RightDelim:       "}}",
+}
+
+func init() <span class="cov0" title="0">{
+        swag.Register(SwaggerInfo.InstanceName(), SwaggerInfo)
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package config
 
 import (
         "fmt"
@@ -215,7 +716,10 @@ type DatabaseConfig struct {
 }
 
 type JWTConfig struct {
-        Secret string
+        Secret    string
+        Issuer    string
+        Audience  string
+        ClockSkew time.Duration
 }
 
 func Load() (*Config, error) <span class="cov0" title="0">{
@@ -241,7 +745,10 @@ func Load() (*Config, error) <span class="cov0" title="0">{
                         MinConns: int32(getEnvInt("DB_MIN_CONNS", 5)),
                 },
                 JWT: JWTConfig{
-                        Secret: getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+                        Secret:    getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+                        Issuer:    getEnv("JWT_ISSUER", "strive-api"),
+                        Audience:  getEnv("JWT_AUDIENCE", "strive-app"),
+                        ClockSkew: getEnvDuration("JWT_CLOCK_SKEW", 2*time.Minute),
                 },
         }
 
@@ -321,7 +828,7 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration <span 
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">package database
+		<pre class="file" id="file3" style="display: none">package database
 
 import (
         "context"
@@ -392,7 +899,7 @@ func (db *Database) Health(ctx context.Context) error <span class="cov0" title="
 }</span>
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">package http
+		<pre class="file" id="file4" style="display: none">package http
 
 import (
         "encoding/json"
@@ -401,44 +908,67 @@ import (
         "github.com/aleksandr/strive-api/internal/logger"
         "github.com/aleksandr/strive-api/internal/models"
         "github.com/aleksandr/strive-api/internal/services"
+        "github.com/aleksandr/strive-api/internal/validation"
 )
 
 type AuthHandlers struct {
-        authService services.AuthService
-        logger      *logger.Logger
+        authService    services.AuthService
+        logger         *logger.Logger
+        securityLogger *SecurityLogger
 }
 
 func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *AuthHandlers <span class="cov10" title="6">{
         return &amp;AuthHandlers{
-                authService: authService,
-                logger:      logger,
+                authService:    authService,
+                logger:         logger,
+                securityLogger: NewSecurityLogger(logger),
         }
 }</span>
 
+// RegisterRequest represents user registration data
 type RegisterRequest struct {
-        Email    string `json:"email" validate:"required,email"`
-        Password string `json:"password" validate:"required,min=8"`
+        Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+        Password string `json:"password" validate:"required,min=8" example:"password123"`
 }
 
+// LoginRequest represents user login credentials
 type LoginRequest struct {
-        Email    string `json:"email" validate:"required,email"`
-        Password string `json:"password" validate:"required"`
+        Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+        Password string `json:"password" validate:"required" example:"password123"`
 }
 
+// RefreshRequest represents refresh token request
+type RefreshRequest struct {
+        RefreshToken string `json:"refresh_token" validate:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+}
+
+// AuthResponse represents authentication response
 type AuthResponse struct {
-        AccessToken  string `json:"access_token"`
-        RefreshToken string `json:"refresh_token"`
-        ExpiresIn    int    `json:"expires_in"`
-        TokenType    string `json:"token_type"`
+        AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+        RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+        ExpiresIn    int    `json:"expires_in" example:"900"`
+        TokenType    string `json:"token_type" example:"Bearer"`
 }
 
+// ErrorResponse represents API error response
 type ErrorResponse struct {
         Error struct {
-                Code    string `json:"code"`
-                Message string `json:"message"`
+                Code    string `json:"code" example:"VALIDATION_ERROR"`
+                Message string `json:"message" example:"Invalid input data"`
         } `json:"error"`
 }
 
+// Register godoc
+// @Summary Register a new user
+// @Description Create a new user account with email and password
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "User registration data"
+// @Success 201 {object} map[string]interface{} "User registered successfully"
+// @Failure 400 {object} ErrorResponse "Invalid request data"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /api/v1/auth/register [post]
 func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) <span class="cov6" title="3">{
         var req RegisterRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
@@ -447,13 +977,41 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) <span cl
                 return
         }</span>
 
-        <span class="cov6" title="3">createReq := &amp;models.CreateUserRequest{
+        // Validate input
+        <span class="cov6" title="3">var validationErrors validation.ValidationErrors
+        if err := validation.ValidateEmail(req.Email); err != nil </span><span class="cov1" title="1">{
+                validationErrors = append(validationErrors, validation.ValidationError{
+                        Field:   "email",
+                        Message: err.Error(),
+                })
+        }</span>
+        <span class="cov6" title="3">if err := validation.ValidatePassword(req.Password); err != nil </span><span class="cov1" title="1">{
+                validationErrors = append(validationErrors, validation.ValidationError{
+                        Field:   "password",
+                        Message: err.Error(),
+                })
+        }</span>
+
+        <span class="cov6" title="3">if len(validationErrors) &gt; 0 </span><span class="cov1" title="1">{
+                h.logger.Warn("Validation failed for register request", "errors", validationErrors)
+                var errorMessages []string
+                for _, err := range validationErrors </span><span class="cov4" title="2">{
+                        errorMessages = append(errorMessages, err.Message)
+                }</span>
+                <span class="cov1" title="1">h.securityLogger.LogInvalidInput(r, errorMessages)
+                w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(http.StatusBadRequest)
+                _ = json.NewEncoder(w).Encode(validationErrors.ToJSON())
+                return</span>
+        }
+
+        <span class="cov4" title="2">createReq := &amp;models.CreateUserRequest{
                 Email:    req.Email,
                 Password: req.Password,
         }
 
         user, err := h.authService.Register(r.Context(), createReq)
-        if err != nil </span><span class="cov4" title="2">{
+        if err != nil </span><span class="cov1" title="1">{
                 h.logger.Error("Failed to register user", "error", err, "email", req.Email)
                 http.Error(w, `{"error":{"code":"REGISTRATION_FAILED","message":"Failed to register user"}}`, http.StatusBadRequest)
                 return
@@ -463,12 +1021,23 @@ func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) <span cl
 
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusCreated)
-        json.NewEncoder(w).Encode(map[string]interface{}{
+        _ = json.NewEncoder(w).Encode(map[string]interface{}{
                 "message": "User registered successfully",
                 "user_id": user.ID,
         })</span>
 }
 
+// Login godoc
+// @Summary Login user
+// @Description Authenticate user and return JWT tokens
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "User login credentials"
+// @Success 200 {object} AuthResponse "Login successful"
+// @Failure 400 {object} ErrorResponse "Invalid request data"
+// @Failure 401 {object} ErrorResponse "Invalid credentials"
+// @Router /api/v1/auth/login [post]
 func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) <span class="cov6" title="3">{
         var req LoginRequest
         if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
@@ -477,9 +1046,38 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) <span class
                 return
         }</span>
 
-        <span class="cov6" title="3">accessToken, refreshToken, err := h.authService.Login(r.Context(), req.Email, req.Password)
-        if err != nil </span><span class="cov4" title="2">{
+        // Validate input
+        <span class="cov6" title="3">var validationErrors validation.ValidationErrors
+        if err := validation.ValidateEmail(req.Email); err != nil </span><span class="cov1" title="1">{
+                validationErrors = append(validationErrors, validation.ValidationError{
+                        Field:   "email",
+                        Message: err.Error(),
+                })
+        }</span>
+        <span class="cov6" title="3">if req.Password == "" </span><span class="cov1" title="1">{
+                validationErrors = append(validationErrors, validation.ValidationError{
+                        Field:   "password",
+                        Message: "password is required",
+                })
+        }</span>
+
+        <span class="cov6" title="3">if len(validationErrors) &gt; 0 </span><span class="cov1" title="1">{
+                h.logger.Warn("Validation failed for login request", "errors", validationErrors)
+                var errorMessages []string
+                for _, err := range validationErrors </span><span class="cov4" title="2">{
+                        errorMessages = append(errorMessages, err.Message)
+                }</span>
+                <span class="cov1" title="1">h.securityLogger.LogInvalidInput(r, errorMessages)
+                w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(http.StatusBadRequest)
+                _ = json.NewEncoder(w).Encode(validationErrors.ToJSON())
+                return</span>
+        }
+
+        <span class="cov4" title="2">accessToken, refreshToken, err := h.authService.Login(r.Context(), req.Email, req.Password)
+        if err != nil </span><span class="cov1" title="1">{
                 h.logger.Error("Failed to login user", "error", err, "email", req.Email)
+                h.securityLogger.LogFailedAuth(r, "invalid_credentials")
                 http.Error(w, `{"error":{"code":"INVALID_CREDENTIALS","message":"Invalid email or password"}}`, http.StatusUnauthorized)
                 return
         }</span>
@@ -489,59 +1087,164 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) <span class
         response := AuthResponse{
                 AccessToken:  accessToken,
                 RefreshToken: refreshToken,
-                ExpiresIn:    900, // 15 minutes
+                ExpiresIn:    900,
                 TokenType:    "Bearer",
         }
 
         w.Header().Set("Content-Type", "application/json")
         w.WriteHeader(http.StatusOK)
-        json.NewEncoder(w).Encode(response)</span>
+        _ = json.NewEncoder(w).Encode(response)</span>
+}
+
+// Refresh godoc
+// @Summary Refresh access token
+// @Description Refresh access token using refresh token
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Param request body RefreshRequest true "Refresh token data"
+// @Success 200 {object} AuthResponse "Token refreshed successfully"
+// @Failure 400 {object} ErrorResponse "Invalid request data"
+// @Failure 401 {object} ErrorResponse "Invalid refresh token"
+// @Router /api/v1/auth/refresh [post]
+func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        var req RefreshRequest
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
+                h.logger.Error("Failed to decode refresh request", "error", err)
+                http.Error(w, `{"error":{"code":"INVALID_REQUEST","message":"Invalid JSON"}}`, http.StatusBadRequest)
+                return
+        }</span>
+
+        <span class="cov0" title="0">if req.RefreshToken == "" </span><span class="cov0" title="0">{
+                h.logger.Warn("Empty refresh token provided")
+                h.securityLogger.LogInvalidInput(r, []string{"refresh_token is required"})
+                http.Error(w, `{"error":{"code":"VALIDATION_ERROR","message":"refresh_token is required"}}`, http.StatusBadRequest)
+                return
+        }</span>
+
+        <span class="cov0" title="0">accessToken, refreshToken, err := h.authService.RefreshToken(r.Context(), req.RefreshToken)
+        if err != nil </span><span class="cov0" title="0">{
+                h.logger.Error("Failed to refresh token", "error", err)
+                h.securityLogger.LogFailedAuth(r, "invalid_refresh_token")
+                http.Error(w, `{"error":{"code":"INVALID_REFRESH_TOKEN","message":"Invalid or expired refresh token"}}`, http.StatusUnauthorized)
+                return
+        }</span>
+
+        <span class="cov0" title="0">h.logger.Info("Token refreshed successfully")
+
+        response := AuthResponse{
+                AccessToken:  accessToken,
+                RefreshToken: refreshToken,
+                ExpiresIn:    900,
+                TokenType:    "Bearer",
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        _ = json.NewEncoder(w).Encode(response)</span>
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package http
+		<pre class="file" id="file5" style="display: none">package http
 
 import (
         "context"
+        "encoding/json"
+        "errors"
         "net/http"
         "strings"
 
+        "github.com/aleksandr/strive-api/internal/logger"
         "github.com/aleksandr/strive-api/internal/services"
 )
 
 type contextKey string
 
-const UserIDKey contextKey = "user_id"
-const UserEmailKey contextKey = "user_email"
+const (
+        UserIDKey    contextKey = "user_id"
+        UserEmailKey contextKey = "user_email"
+)
 
-func AuthMiddleware(authService services.AuthService) func(http.Handler) http.Handler <span class="cov10" title="6">{
-        return func(next http.Handler) http.Handler </span><span class="cov10" title="6">{
-                return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov10" title="6">{
+type AuthError struct {
+        Error struct {
+                Code    string `json:"code"`
+                Message string `json:"message"`
+        } `json:"error"`
+}
+
+func writeAuthError(w http.ResponseWriter, log *logger.Logger, r *http.Request, code, message, reason string) <span class="cov8" title="6">{
+        authErr := AuthError{}
+        authErr.Error.Code = code
+        authErr.Error.Message = message
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusUnauthorized)
+
+        if err := json.NewEncoder(w).Encode(authErr); err != nil </span><span class="cov0" title="0">{
+                log.Error("Failed to encode auth error", "error", err)
+                http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"Internal server error"}}`, http.StatusInternalServerError)
+                return
+        }</span>
+
+        <span class="cov8" title="6">logAuthFailure(log, r, reason)</span>
+}
+
+func logAuthFailure(log *logger.Logger, r *http.Request, reason string) <span class="cov8" title="6">{
+        log.Warn("Authentication failed",
+                "reason", reason,
+                "path", r.URL.Path,
+                "method", r.Method,
+                "remote_addr", r.RemoteAddr,
+                "user_agent", r.Header.Get("User-Agent"),
+                "request_id", r.Header.Get("X-Request-ID"),
+        )
+}</span>
+
+func AuthMiddleware(authService services.AuthService, log *logger.Logger) func(http.Handler) http.Handler <span class="cov10" title="8">{
+        return func(next http.Handler) http.Handler </span><span class="cov10" title="8">{
+                return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov10" title="8">{
                         authHeader := r.Header.Get("Authorization")
                         if authHeader == "" </span><span class="cov1" title="1">{
-                                http.Error(w, `{"error":{"code":"UNAUTHORIZED","message":"Authorization header required"}}`, http.StatusUnauthorized)
+                                writeAuthError(w, log, r, "UNAUTHORIZED", "Authorization header required", "missing_auth_header")
                                 return
                         }</span>
 
-                        <span class="cov9" title="5">parts := strings.SplitN(authHeader, " ", 2)
+                        <span class="cov9" title="7">parts := strings.SplitN(authHeader, " ", 2)
                         if len(parts) != 2 || parts[0] != "Bearer" </span><span class="cov1" title="1">{
-                                http.Error(w, `{"error":{"code":"INVALID_TOKEN","message":"Bearer token required"}}`, http.StatusUnauthorized)
+                                writeAuthError(w, log, r, "BEARER_REQUIRED", "Bearer token required", "invalid_auth_format")
                                 return
                         }</span>
 
-                        <span class="cov7" title="4">tokenString := parts[1]
+                        <span class="cov8" title="6">tokenString := parts[1]
                         if tokenString == "" </span><span class="cov1" title="1">{
-                                http.Error(w, `{"error":{"code":"EMPTY_TOKEN","message":"Token cannot be empty"}}`, http.StatusUnauthorized)
+                                writeAuthError(w, log, r, "TOKEN_EMPTY", "Token cannot be empty", "empty_token")
                                 return
                         }</span>
 
-                        <span class="cov6" title="3">claims, err := authService.ValidateToken(tokenString)
-                        if err != nil </span><span class="cov1" title="1">{
-                                http.Error(w, `{"error":{"code":"INVALID_TOKEN","message":"Invalid or expired token"}}`, http.StatusUnauthorized)
-                                return
-                        }</span>
+                        <span class="cov7" title="5">claims, err := authService.ValidateToken(tokenString)
+                        if err != nil </span><span class="cov5" title="3">{
+                                var code, message, reason string
 
-                        <span class="cov4" title="2">ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+                                switch </span>{
+                                case errors.Is(err, services.ErrTokenExpired):<span class="cov1" title="1">
+                                        code, message, reason = "TOKEN_EXPIRED", "Token has expired", "token_expired"</span>
+                                case errors.Is(err, services.ErrTokenNotBefore):<span class="cov0" title="0">
+                                        code, message, reason = "TOKEN_NOT_VALID_YET", "Token is not valid yet", "token_not_before"</span>
+                                case errors.Is(err, services.ErrInvalidSignature):<span class="cov0" title="0">
+                                        code, message, reason = "INVALID_TOKEN", "Invalid token signature", "invalid_signature"</span>
+                                case errors.Is(err, services.ErrInvalidIssuer):<span class="cov1" title="1">
+                                        code, message, reason = "INVALID_ISSUER", "Invalid token issuer", "invalid_issuer"</span>
+                                case errors.Is(err, services.ErrInvalidAudience):<span class="cov1" title="1">
+                                        code, message, reason = "INVALID_AUDIENCE", "Invalid token audience", "invalid_audience"</span>
+                                default:<span class="cov0" title="0">
+                                        code, message, reason = "INVALID_TOKEN", "Invalid or malformed token", "token_validation_failed"</span>
+                                }
+
+                                <span class="cov5" title="3">writeAuthError(w, log, r, code, message, reason)
+                                return</span>
+                        }
+
+                        <span class="cov4" title="2">ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID.String())
                         ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 
                         next.ServeHTTP(w, r.WithContext(ctx))</span>
@@ -549,36 +1252,238 @@ func AuthMiddleware(authService services.AuthService) func(http.Handler) http.Ha
         }
 }
 
-func GetUserIDFromContext(ctx context.Context) (string, bool) <span class="cov0" title="0">{
+func GetUserIDFromContext(ctx context.Context) (string, bool) <span class="cov4" title="2">{
         userID, ok := ctx.Value(UserIDKey).(string)
         return userID, ok
 }</span>
 
-func GetUserEmailFromContext(ctx context.Context) (string, bool) <span class="cov0" title="0">{
+func GetUserEmailFromContext(ctx context.Context) (string, bool) <span class="cov4" title="2">{
         email, ok := ctx.Value(UserEmailKey).(string)
         return email, ok
 }</span>
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">package http
+		<pre class="file" id="file6" style="display: none">package http
 
 import (
-        "encoding/json"
         "net/http"
+
+        "github.com/rs/cors"
 )
 
-type HealthResponse struct {
-        Status string `json:"status"`
-}
+func NewCORSMiddleware() func(http.Handler) http.Handler <span class="cov0" title="0">{
+        c := cors.New(cors.Options{
+                AllowedOrigins: []string{
+                        "http://localhost:3000",
+                        "http://localhost:3001",
+                        "http://localhost:4200",
+                        "http://127.0.0.1:3000",
+                        "http://127.0.0.1:3001",
+                        "http://127.0.0.1:4200",
+                        "https://satanlittlehelper.github.io",
+                },
+                AllowedMethods: []string{
+                        http.MethodGet,
+                        http.MethodPost,
+                        http.MethodPut,
+                        http.MethodDelete,
+                        http.MethodOptions,
+                },
+                AllowedHeaders: []string{
+                        "Accept",
+                        "Authorization",
+                        "Content-Type",
+                        "X-Request-ID",
+                },
+                ExposedHeaders: []string{
+                        "X-Request-ID",
+                },
+                AllowCredentials: true,
+                MaxAge:           86400, // 24 hours
+        })
 
-func HealthHandler(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusOK)
-        _ = json.NewEncoder(w).Encode(HealthResponse{Status: "ok"})
+        return c.Handler
 }</span>
 </pre>
 		
-		<pre class="file" id="file6" style="display: none">package http
+		<pre class="file" id="file7" style="display: none">package http
+
+import (
+        "context"
+        "encoding/json"
+        "net/http"
+        "time"
+
+        "github.com/aleksandr/strive-api/internal/logger"
+        "github.com/jackc/pgx/v5/pgxpool"
+)
+
+type DetailedHealthHandler struct {
+        logger *logger.Logger
+        db     *pgxpool.Pool
+}
+
+func NewDetailedHealthHandler(logger *logger.Logger, db *pgxpool.Pool) *DetailedHealthHandler <span class="cov0" title="0">{
+        return &amp;DetailedHealthHandler{
+                logger: logger,
+                db:     db,
+        }
+}</span>
+
+type DetailedHealthResponse struct {
+        Status    string                 `json:"status"`
+        Timestamp string                 `json:"timestamp"`
+        Services  map[string]ServiceInfo `json:"services,omitempty"`
+}
+
+type ServiceInfo struct {
+        Status  string `json:"status"`
+        Message string `json:"message,omitempty"`
+}
+
+// Health godoc
+// @Summary Health check
+// @Description Check if the API is running
+// @Tags system
+// @Accept json
+// @Produce json
+// @Success 200 {object} DetailedHealthResponse "API is healthy"
+// @Router /health [get]
+func (h *DetailedHealthHandler) Health(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        response := DetailedHealthResponse{
+                Status:    "ok",
+                Timestamp: time.Now().UTC().Format(time.RFC3339),
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        _ = json.NewEncoder(w).Encode(response)
+}</span>
+
+// DatabaseHealth godoc
+// @Summary Database health check
+// @Description Check if the database is accessible
+// @Tags system
+// @Accept json
+// @Produce json
+// @Success 200 {object} DetailedHealthResponse "Database is healthy"
+// @Failure 503 {object} DetailedHealthResponse "Database is unhealthy"
+// @Router /health/db [get]
+func (h *DetailedHealthHandler) DatabaseHealth(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        response := DetailedHealthResponse{
+                Timestamp: time.Now().UTC().Format(time.RFC3339),
+                Services:  make(map[string]ServiceInfo),
+        }
+
+        // Check database connection
+        if h.db != nil </span><span class="cov0" title="0">{
+                ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+                defer cancel()
+
+                if err := h.db.Ping(ctx); err != nil </span><span class="cov0" title="0">{
+                        h.logger.Error("Database health check failed", "error", err)
+                        response.Status = "unhealthy"
+                        response.Services["database"] = ServiceInfo{
+                                Status:  "down",
+                                Message: "Database connection failed",
+                        }
+                        w.Header().Set("Content-Type", "application/json")
+                        w.WriteHeader(http.StatusServiceUnavailable)
+                        _ = json.NewEncoder(w).Encode(response)
+                        return
+                }</span>
+
+                <span class="cov0" title="0">response.Services["database"] = ServiceInfo{
+                        Status: "up",
+                }</span>
+        } else<span class="cov0" title="0"> {
+                response.Status = "unhealthy"
+                response.Services["database"] = ServiceInfo{
+                        Status:  "down",
+                        Message: "Database not configured",
+                }
+                w.Header().Set("Content-Type", "application/json")
+                w.WriteHeader(http.StatusServiceUnavailable)
+                _ = json.NewEncoder(w).Encode(response)
+                return
+        }</span>
+
+        <span class="cov0" title="0">response.Status = "ok"
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        _ = json.NewEncoder(w).Encode(response)</span>
+}
+
+// DetailedHealth godoc
+// @Summary Detailed health check
+// @Description Check all system components
+// @Tags system
+// @Accept json
+// @Produce json
+// @Success 200 {object} DetailedHealthResponse "All systems healthy"
+// @Failure 503 {object} DetailedHealthResponse "Some systems unhealthy"
+// @Router /health/detailed [get]
+func (h *DetailedHealthHandler) DetailedHealth(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        response := DetailedHealthResponse{
+                Timestamp: time.Now().UTC().Format(time.RFC3339),
+                Services:  make(map[string]ServiceInfo),
+        }
+
+        allHealthy := true
+
+        // Check database
+        if h.db != nil </span><span class="cov0" title="0">{
+                ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+                defer cancel()
+
+                if err := h.db.Ping(ctx); err != nil </span><span class="cov0" title="0">{
+                        h.logger.Error("Database health check failed", "error", err)
+                        response.Services["database"] = ServiceInfo{
+                                Status:  "down",
+                                Message: "Database connection failed",
+                        }
+                        allHealthy = false
+                }</span> else<span class="cov0" title="0"> {
+                        response.Services["database"] = ServiceInfo{
+                                Status: "up",
+                        }
+                }</span>
+        } else<span class="cov0" title="0"> {
+                response.Services["database"] = ServiceInfo{
+                        Status:  "down",
+                        Message: "Database not configured",
+                }
+                allHealthy = false
+        }</span>
+
+        // Add other service checks here as needed
+        <span class="cov0" title="0">response.Services["api"] = ServiceInfo{
+                Status: "up",
+        }
+
+        if allHealthy </span><span class="cov0" title="0">{
+                response.Status = "ok"
+                w.WriteHeader(http.StatusOK)
+        }</span> else<span class="cov0" title="0"> {
+                response.Status = "degraded"
+                w.WriteHeader(http.StatusServiceUnavailable)
+        }</span>
+
+        <span class="cov0" title="0">w.Header().Set("Content-Type", "application/json")
+        _ = json.NewEncoder(w).Encode(response)</span>
+}
+
+func HealthHandler(w http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        response := map[string]string{
+                "status": "ok",
+        }
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        _ = json.NewEncoder(w).Encode(response)
+}</span>
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package http
 
 import (
         "context"
@@ -589,6 +1494,10 @@ import (
         "github.com/aleksandr/strive-api/internal/logger"
         "github.com/google/uuid"
 )
+
+type requestIDKeyType string
+
+const requestIDKey requestIDKeyType = "request_id"
 
 type loggingResponseWriter struct {
         http.ResponseWriter
@@ -640,7 +1549,7 @@ func RequestIDMiddleware() func(http.Handler) http.Handler <span class="cov10" t
                                 requestID = uuid.New().String()
                         }</span>
 
-                        <span class="cov10" title="4">ctx := context.WithValue(r.Context(), "request_id", requestID)
+                        <span class="cov10" title="4">ctx := context.WithValue(r.Context(), requestIDKey, requestID)
                         w.Header().Set("X-Request-ID", requestID)
                         next.ServeHTTP(w, r.WithContext(ctx))</span>
                 })
@@ -648,7 +1557,119 @@ func RequestIDMiddleware() func(http.Handler) http.Handler <span class="cov10" t
 }
 </pre>
 		
-		<pre class="file" id="file7" style="display: none">package http
+		<pre class="file" id="file9" style="display: none">package http
+
+import (
+        "net/http"
+        "strings"
+        "time"
+
+        "github.com/aleksandr/strive-api/internal/logger"
+)
+
+type SecurityLogger struct {
+        logger *logger.Logger
+}
+
+func NewSecurityLogger(logger *logger.Logger) *SecurityLogger <span class="cov10" title="6">{
+        return &amp;SecurityLogger{
+                logger: logger,
+        }
+}</span>
+
+func (sl *SecurityLogger) LogSecurityEvent(event string, r *http.Request, details map[string]interface{}) <span class="cov6" title="3">{
+        fields := map[string]interface{}{
+                "event":       event,
+                "timestamp":   time.Now().UTC().Format(time.RFC3339),
+                "method":      r.Method,
+                "path":        r.URL.Path,
+                "remote_addr": getClientIP(r),
+                "user_agent":  r.UserAgent(),
+        }
+
+        for k, v := range details </span><span class="cov6" title="3">{
+                fields[k] = v
+        }</span>
+
+        <span class="cov6" title="3">sl.logger.Warn("Security event", "fields", fields)</span>
+}
+
+func (sl *SecurityLogger) LogFailedAuth(r *http.Request, reason string) <span class="cov1" title="1">{
+        sl.LogSecurityEvent("failed_authentication", r, map[string]interface{}{
+                "reason": reason,
+        })
+}</span>
+
+func (sl *SecurityLogger) LogSuspiciousActivity(r *http.Request, reason string) <span class="cov0" title="0">{
+        sl.LogSecurityEvent("suspicious_activity", r, map[string]interface{}{
+                "reason": reason,
+        })
+}</span>
+
+func (sl *SecurityLogger) LogRateLimitExceeded(r *http.Request, limit int) <span class="cov0" title="0">{
+        sl.LogSecurityEvent("rate_limit_exceeded", r, map[string]interface{}{
+                "limit": limit,
+        })
+}</span>
+
+func (sl *SecurityLogger) LogInvalidInput(r *http.Request, validationErrors []string) <span class="cov4" title="2">{
+        sl.LogSecurityEvent("invalid_input", r, map[string]interface{}{
+                "validation_errors": validationErrors,
+        })
+}</span>
+
+func getClientIP(r *http.Request) string <span class="cov6" title="3">{
+        if ip := r.Header.Get("X-Forwarded-For"); ip != "" </span><span class="cov0" title="0">{
+                if idx := strings.Index(ip, ","); idx != -1 </span><span class="cov0" title="0">{
+                        return strings.TrimSpace(ip[:idx])
+                }</span>
+                <span class="cov0" title="0">return strings.TrimSpace(ip)</span>
+        }
+        <span class="cov6" title="3">if ip := r.Header.Get("X-Real-IP"); ip != "" </span><span class="cov0" title="0">{
+                return strings.TrimSpace(ip)
+        }</span>
+        <span class="cov6" title="3">return r.RemoteAddr</span>
+}
+
+// SecurityMiddleware logs security-related events
+func (sl *SecurityLogger) SecurityMiddleware() func(http.Handler) http.Handler <span class="cov0" title="0">{
+        return func(next http.Handler) http.Handler </span><span class="cov0" title="0">{
+                return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+                        if isSuspiciousRequest(r) </span><span class="cov0" title="0">{
+                                sl.LogSuspiciousActivity(r, "suspicious_request_pattern")
+                        }</span>
+
+                        <span class="cov0" title="0">next.ServeHTTP(w, r)</span>
+                })
+        }
+}
+
+func isSuspiciousRequest(r *http.Request) bool <span class="cov0" title="0">{
+        suspiciousPatterns := []string{
+                "../",
+                "&lt;script",
+                "javascript:",
+                "eval(",
+                "exec(",
+                "union select",
+                "drop table",
+                "delete from",
+        }
+
+        path := strings.ToLower(r.URL.Path)
+        query := strings.ToLower(r.URL.RawQuery)
+
+        for _, pattern := range suspiciousPatterns </span><span class="cov0" title="0">{
+                if strings.Contains(path, pattern) || strings.Contains(query, pattern) </span><span class="cov0" title="0">{
+                        return true
+                }</span>
+        }
+
+        <span class="cov0" title="0">return len(r.URL.RawQuery) &gt; 2048</span>
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package http
 
 import (
         "context"
@@ -715,7 +1736,7 @@ func (s *Server) WaitForShutdown() <span class="cov0" title="0">{
 }
 </pre>
 		
-		<pre class="file" id="file8" style="display: none">package logger
+		<pre class="file" id="file11" style="display: none">package logger
 
 import (
         "context"
@@ -729,6 +1750,10 @@ import (
 type Logger struct {
         *slog.Logger
 }
+
+type contextKey string
+
+const loggerKey contextKey = "logger"
 
 func New(level, format string) *Logger <span class="cov0" title="0">{
         var logLevel slog.Level
@@ -746,7 +1771,7 @@ func New(level, format string) *Logger <span class="cov0" title="0">{
         }
 
         <span class="cov0" title="0">var handler slog.Handler
-        if strings.ToLower(format) == "json" </span><span class="cov0" title="0">{
+        if strings.EqualFold(format, "json") </span><span class="cov0" title="0">{
                 handler = slog.NewJSONHandler(os.Stdout, &amp;slog.HandlerOptions{
                         Level: logLevel,
                 })
@@ -767,7 +1792,7 @@ func (l *Logger) WithRequestID(requestID string) *Logger <span class="cov0" titl
         }
 }</span>
 
-func (l *Logger) LogRequest(method, path string, statusCode int, duration string, requestID string) <span class="cov0" title="0">{
+func (l *Logger) LogRequest(method, path string, statusCode int, duration, requestID string) <span class="cov0" title="0">{
         l.WithRequestID(requestID).Info("HTTP request",
                 "method", method,
                 "path", path,
@@ -776,7 +1801,7 @@ func (l *Logger) LogRequest(method, path string, statusCode int, duration string
         )
 }</span>
 
-func (l *Logger) LogError(err error, msg string, requestID string) <span class="cov0" title="0">{
+func (l *Logger) LogError(err error, msg, requestID string) <span class="cov0" title="0">{
         l.WithRequestID(requestID).Error(msg, "error", err.Error())
 }</span>
 
@@ -805,22 +1830,23 @@ func (l *Logger) LogStructured(level, message string, fields map[string]interfac
 }
 
 func FromContext(ctx context.Context) *Logger <span class="cov0" title="0">{
-        if logger, ok := ctx.Value("logger").(*Logger); ok </span><span class="cov0" title="0">{
+        if logger, ok := ctx.Value(loggerKey).(*Logger); ok </span><span class="cov0" title="0">{
                 return logger
         }</span>
         <span class="cov0" title="0">return New("INFO", "json")</span>
 }
 
 func WithContext(ctx context.Context, logger *Logger) context.Context <span class="cov0" title="0">{
-        return context.WithValue(ctx, "logger", logger)
+        return context.WithValue(ctx, loggerKey, logger)
 }</span>
 </pre>
 		
-		<pre class="file" id="file9" style="display: none">package migrate
+		<pre class="file" id="file12" style="display: none">package migrate
 
 import (
         "database/sql"
         "fmt"
+        "os"
         "path/filepath"
 
         "github.com/aleksandr/strive-api/internal/config"
@@ -836,23 +1862,35 @@ func Run(cfg *config.Config, log *logger.Logger) error <span class="cov0" title=
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("failed to open database: %w", err)
         }</span>
-        <span class="cov0" title="0">defer db.Close()
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{ _ = db.Close() }</span>()
 
-        driver, err := postgres.WithInstance(db, &amp;postgres.Config{})
+        <span class="cov0" title="0">driver, err := postgres.WithInstance(db, &amp;postgres.Config{})
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("failed to create postgres driver: %w", err)
         }</span>
 
-        <span class="cov0" title="0">migrationsPath := filepath.Join("migrations")
-        sourceURL := fmt.Sprintf("file://%s", migrationsPath)
+        // Get current working directory
+        <span class="cov0" title="0">wd, err := os.Getwd()
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to get working directory: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">migrationsPath := filepath.Join(wd, "migrations")
+
+        // Check if migrations directory exists
+        if _, err := os.Stat(migrationsPath); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                return fmt.Errorf("migrations directory not found: %s", migrationsPath)
+        }</span>
+
+        <span class="cov0" title="0">sourceURL := fmt.Sprintf("file://%s", migrationsPath)
 
         m, err := migrate.NewWithDatabaseInstance(sourceURL, "postgres", driver)
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("failed to create migrate instance: %w", err)
         }</span>
-        <span class="cov0" title="0">defer m.Close()
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{ _, _ = m.Close() }</span>()
 
-        log.Info("Running database migrations", "path", migrationsPath)
+        <span class="cov0" title="0">log.Info("Running database migrations", "path", migrationsPath, "working_dir", wd)
 
         if err := m.Up(); err != nil &amp;&amp; err != migrate.ErrNoChange </span><span class="cov0" title="0">{
                 return fmt.Errorf("failed to run migrations: %w", err)
@@ -872,7 +1910,7 @@ func Run(cfg *config.Config, log *logger.Logger) error <span class="cov0" title=
 }
 </pre>
 		
-		<pre class="file" id="file10" style="display: none">package repositories
+		<pre class="file" id="file13" style="display: none">package repositories
 
 import (
         "context"
@@ -986,13 +2024,15 @@ func (r *userRepository) Delete(ctx context.Context, id uuid.UUID) error <span c
 }
 </pre>
 		
-		<pre class="file" id="file11" style="display: none">package services
+		<pre class="file" id="file14" style="display: none">package services
 
 import (
         "context"
+        "errors"
         "fmt"
         "time"
 
+        "github.com/aleksandr/strive-api/internal/config"
         "github.com/aleksandr/strive-api/internal/models"
         "github.com/aleksandr/strive-api/internal/repositories"
         "github.com/golang-jwt/jwt/v5"
@@ -1000,9 +2040,18 @@ import (
         "golang.org/x/crypto/bcrypt"
 )
 
+var (
+        ErrInvalidSignature = errors.New("invalid token signature")
+        ErrTokenExpired     = errors.New("token has expired")
+        ErrTokenNotBefore   = errors.New("token used before valid")
+        ErrInvalidAudience  = errors.New("invalid token audience")
+        ErrInvalidIssuer    = errors.New("invalid token issuer")
+)
+
 type AuthService interface {
         Register(ctx context.Context, req *models.CreateUserRequest) (*models.User, error)
         Login(ctx context.Context, email, password string) (string, string, error)
+        RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
         ValidateToken(tokenString string) (*Claims, error)
         HashPassword(password string) (string, error)
         VerifyPassword(hashedPassword, password string) error
@@ -1016,32 +2065,32 @@ type Claims struct {
 
 type authService struct {
         userRepo   repositories.UserRepository
-        jwtSecret  string
+        config     *config.JWTConfig
         accessTTL  time.Duration
         refreshTTL time.Duration
 }
 
-func NewAuthService(userRepo repositories.UserRepository, jwtSecret string) AuthService <span class="cov10" title="4">{
+func NewAuthService(userRepo repositories.UserRepository, jwtConfig *config.JWTConfig) AuthService <span class="cov5" title="3">{
         return &amp;authService{
                 userRepo:   userRepo,
-                jwtSecret:  jwtSecret,
+                config:     jwtConfig,
                 accessTTL:  15 * time.Minute,
                 refreshTTL: 7 * 24 * time.Hour,
         }
 }</span>
 
-func (s *authService) Register(ctx context.Context, req *models.CreateUserRequest) (*models.User, error) <span class="cov8" title="3">{
+func (s *authService) Register(ctx context.Context, req *models.CreateUserRequest) (*models.User, error) <span class="cov3" title="2">{
         existingUser, err := s.userRepo.GetByEmail(ctx, req.Email)
         if err == nil &amp;&amp; existingUser != nil </span><span class="cov0" title="0">{
                 return nil, fmt.Errorf("user with email %s already exists", req.Email)
         }</span>
 
-        <span class="cov8" title="3">hashedPassword, err := s.HashPassword(req.Password)
+        <span class="cov3" title="2">hashedPassword, err := s.HashPassword(req.Password)
         if err != nil </span><span class="cov0" title="0">{
                 return nil, fmt.Errorf("failed to hash password: %w", err)
         }</span>
 
-        <span class="cov8" title="3">user := &amp;models.User{
+        <span class="cov3" title="2">user := &amp;models.User{
                 ID:           uuid.New(),
                 Email:        req.Email,
                 PasswordHash: hashedPassword,
@@ -1053,77 +2102,238 @@ func (s *authService) Register(ctx context.Context, req *models.CreateUserReques
                 return nil, fmt.Errorf("failed to create user: %w", err)
         }</span>
 
-        <span class="cov8" title="3">return user, nil</span>
+        <span class="cov3" title="2">return user, nil</span>
 }
 
-func (s *authService) Login(ctx context.Context, email, password string) (string, string, error) <span class="cov5" title="2">{
+func (s *authService) Login(ctx context.Context, email, password string) (string, string, error) <span class="cov1" title="1">{
         user, err := s.userRepo.GetByEmail(ctx, email)
         if err != nil </span><span class="cov0" title="0">{
                 return "", "", fmt.Errorf("invalid credentials")
         }</span>
 
-        <span class="cov5" title="2">if err := s.VerifyPassword(user.PasswordHash, password); err != nil </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if err := s.VerifyPassword(user.PasswordHash, password); err != nil </span><span class="cov0" title="0">{
                 return "", "", fmt.Errorf("invalid credentials")
         }</span>
 
-        <span class="cov5" title="2">accessToken, err := s.generateToken(user, s.accessTTL)
+        <span class="cov1" title="1">accessToken, err := s.generateToken(user, s.accessTTL)
         if err != nil </span><span class="cov0" title="0">{
                 return "", "", fmt.Errorf("failed to generate access token: %w", err)
         }</span>
 
-        <span class="cov5" title="2">refreshToken, err := s.generateToken(user, s.refreshTTL)
+        <span class="cov1" title="1">refreshToken, err := s.generateToken(user, s.refreshTTL)
         if err != nil </span><span class="cov0" title="0">{
                 return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
         }</span>
 
-        <span class="cov5" title="2">return accessToken, refreshToken, nil</span>
+        <span class="cov1" title="1">return accessToken, refreshToken, nil</span>
 }
 
-func (s *authService) ValidateToken(tokenString string) (*Claims, error) <span class="cov1" title="1">{
-        token, err := jwt.ParseWithClaims(tokenString, &amp;Claims{}, func(token *jwt.Token) (interface{}, error) </span><span class="cov1" title="1">{
-                if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok </span><span class="cov0" title="0">{
-                        return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-                }</span>
-                <span class="cov1" title="1">return []byte(s.jwtSecret), nil</span>
-        })
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) <span class="cov0" title="0">{
+        claims, err := s.ValidateToken(refreshToken)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", "", fmt.Errorf("invalid refresh token")
+        }</span>
 
-        <span class="cov1" title="1">if err != nil </span><span class="cov0" title="0">{
+        <span class="cov0" title="0">user, err := s.userRepo.GetByID(ctx, claims.UserID)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", "", fmt.Errorf("user not found")
+        }</span>
+
+        <span class="cov0" title="0">accessToken, err := s.generateToken(user, s.accessTTL)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", "", fmt.Errorf("failed to generate access token: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">newRefreshToken, err := s.generateToken(user, s.refreshTTL)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return accessToken, newRefreshToken, nil</span>
+}
+
+func (s *authService) ValidateToken(tokenString string) (*Claims, error) <span class="cov10" title="10">{
+        token, err := jwt.ParseWithClaims(tokenString, &amp;Claims{}, func(token *jwt.Token) (interface{}, error) </span><span class="cov9" title="8">{
+                if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok </span><span class="cov0" title="0">{
+                        return nil, ErrInvalidSignature
+                }</span>
+                <span class="cov9" title="8">return []byte(s.config.Secret), nil</span>
+        }, jwt.WithoutClaimsValidation())
+        <span class="cov10" title="10">if err != nil </span><span class="cov5" title="3">{
                 return nil, fmt.Errorf("failed to parse token: %w", err)
         }</span>
 
-        <span class="cov1" title="1">if claims, ok := token.Claims.(*Claims); ok &amp;&amp; token.Valid </span><span class="cov1" title="1">{
-                return claims, nil
+        <span class="cov8" title="7">claims, ok := token.Claims.(*Claims)
+        if !ok </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("invalid token claims")
         }</span>
 
-        <span class="cov0" title="0">return nil, fmt.Errorf("invalid token")</span>
+        <span class="cov8" title="7">now := time.Now()
+        clockSkew := s.config.ClockSkew
+
+        if claims.ExpiresAt != nil &amp;&amp; now.After(claims.ExpiresAt.Time.Add(clockSkew)) </span><span class="cov1" title="1">{
+                return nil, ErrTokenExpired
+        }</span>
+
+        <span class="cov8" title="6">if claims.NotBefore != nil &amp;&amp; now.Before(claims.NotBefore.Time.Add(-clockSkew)) </span><span class="cov1" title="1">{
+                return nil, ErrTokenNotBefore
+        }</span>
+
+        <span class="cov7" title="5">if claims.Issuer != s.config.Issuer </span><span class="cov1" title="1">{
+                return nil, ErrInvalidIssuer
+        }</span>
+
+        <span class="cov6" title="4">audience, err := claims.RegisteredClaims.GetAudience()
+        if err != nil || len(audience) == 0 </span><span class="cov0" title="0">{
+                return nil, ErrInvalidAudience
+        }</span>
+
+        <span class="cov6" title="4">found := false
+        for _, aud := range audience </span><span class="cov6" title="4">{
+                if aud == s.config.Audience </span><span class="cov5" title="3">{
+                        found = true
+                        break</span>
+                }
+        }
+        <span class="cov6" title="4">if !found </span><span class="cov1" title="1">{
+                return nil, ErrInvalidAudience
+        }</span>
+
+        <span class="cov5" title="3">return claims, nil</span>
 }
 
-func (s *authService) HashPassword(password string) (string, error) <span class="cov10" title="4">{
+func (s *authService) HashPassword(password string) (string, error) <span class="cov5" title="3">{
         hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
         if err != nil </span><span class="cov0" title="0">{
                 return "", fmt.Errorf("failed to hash password: %w", err)
         }</span>
-        <span class="cov10" title="4">return string(hashedBytes), nil</span>
+        <span class="cov5" title="3">return string(hashedBytes), nil</span>
 }
 
-func (s *authService) VerifyPassword(hashedPassword, password string) error <span class="cov10" title="4">{
+func (s *authService) VerifyPassword(hashedPassword, password string) error <span class="cov5" title="3">{
         return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 }</span>
 
-func (s *authService) generateToken(user *models.User, ttl time.Duration) (string, error) <span class="cov10" title="4">{
+func (s *authService) generateToken(user *models.User, ttl time.Duration) (string, error) <span class="cov5" title="3">{
+        now := time.Now()
         claims := &amp;Claims{
                 UserID: user.ID,
                 Email:  user.Email,
                 RegisteredClaims: jwt.RegisteredClaims{
-                        ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
-                        IssuedAt:  jwt.NewNumericDate(time.Now()),
-                        NotBefore: jwt.NewNumericDate(time.Now()),
+                        Issuer:    s.config.Issuer,
+                        Audience:  jwt.ClaimStrings{s.config.Audience},
+                        ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+                        IssuedAt:  jwt.NewNumericDate(now),
+                        NotBefore: jwt.NewNumericDate(now),
                 },
         }
 
         token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-        return token.SignedString([]byte(s.jwtSecret))
+        return token.SignedString([]byte(s.config.Secret))
 }</span>
+</pre>
+		
+		<pre class="file" id="file15" style="display: none">package validation
+
+import (
+        "fmt"
+        "regexp"
+        "strings"
+        "unicode"
+)
+
+type ValidationError struct {
+        Field   string `json:"field"`
+        Message string `json:"message"`
+}
+
+type ValidationErrors []ValidationError
+
+func (ve ValidationErrors) Error() string <span class="cov0" title="0">{
+        var messages []string
+        for _, err := range ve </span><span class="cov0" title="0">{
+                messages = append(messages, fmt.Sprintf("%s: %s", err.Field, err.Message))
+        }</span>
+        <span class="cov0" title="0">return strings.Join(messages, "; ")</span>
+}
+
+func (ve ValidationErrors) ToJSON() map[string]interface{} <span class="cov0" title="0">{
+        errors := make(map[string]interface{})
+        for _, err := range ve </span><span class="cov0" title="0">{
+                errors[err.Field] = err.Message
+        }</span>
+        <span class="cov0" title="0">return map[string]interface{}{
+                "error": map[string]interface{}{
+                        "code":    "VALIDATION_ERROR",
+                        "message": "Validation failed",
+                        "details": errors,
+                },
+        }</span>
+}
+
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+
+func ValidateEmail(email string) error <span class="cov0" title="0">{
+        if email == "" </span><span class="cov0" title="0">{
+                return fmt.Errorf("email is required")
+        }</span>
+        <span class="cov0" title="0">if !emailRegex.MatchString(email) </span><span class="cov0" title="0">{
+                return fmt.Errorf("invalid email format")
+        }</span>
+        <span class="cov0" title="0">if len(email) &gt; 255 </span><span class="cov0" title="0">{
+                return fmt.Errorf("email too long (max 255 characters)")
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func ValidatePassword(password string) error <span class="cov0" title="0">{
+        if password == "" </span><span class="cov0" title="0">{
+                return fmt.Errorf("password is required")
+        }</span>
+        <span class="cov0" title="0">if len(password) &lt; 8 </span><span class="cov0" title="0">{
+                return fmt.Errorf("password must be at least 8 characters long")
+        }</span>
+        <span class="cov0" title="0">if len(password) &gt; 128 </span><span class="cov0" title="0">{
+                return fmt.Errorf("password too long (max 128 characters)")
+        }</span>
+
+        <span class="cov0" title="0">var hasUpper, hasLower, hasDigit bool
+        for _, char := range password </span><span class="cov0" title="0">{
+                switch </span>{
+                case unicode.IsUpper(char):<span class="cov0" title="0">
+                        hasUpper = true</span>
+                case unicode.IsLower(char):<span class="cov0" title="0">
+                        hasLower = true</span>
+                case unicode.IsDigit(char):<span class="cov0" title="0">
+                        hasDigit = true</span>
+                }
+        }
+
+        <span class="cov0" title="0">if !hasUpper </span><span class="cov0" title="0">{
+                return fmt.Errorf("password must contain at least one uppercase letter")
+        }</span>
+        <span class="cov0" title="0">if !hasLower </span><span class="cov0" title="0">{
+                return fmt.Errorf("password must contain at least one lowercase letter")
+        }</span>
+        <span class="cov0" title="0">if !hasDigit </span><span class="cov0" title="0">{
+                return fmt.Errorf("password must contain at least one digit")
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func ValidateString(value, fieldName string, minLen, maxLen int) error <span class="cov0" title="0">{
+        if value == "" </span><span class="cov0" title="0">{
+                return fmt.Errorf("%s is required", fieldName)
+        }</span>
+        <span class="cov0" title="0">if len(value) &lt; minLen </span><span class="cov0" title="0">{
+                return fmt.Errorf("%s must be at least %d characters long", fieldName, minLen)
+        }</span>
+        <span class="cov0" title="0">if len(value) &gt; maxLen </span><span class="cov0" title="0">{
+                return fmt.Errorf("%s too long (max %d characters)", fieldName, maxLen)
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
 </pre>
 		
 		</div>

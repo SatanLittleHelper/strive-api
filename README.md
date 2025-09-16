@@ -39,6 +39,7 @@ A modern workout diary API built with Go, featuring user authentication, JWT tok
    ```bash
    cp env.example .env
    # Edit .env with your configuration
+   # Important: Set a strong JWT_SECRET for production!
    ```
 
 4. **Start PostgreSQL**
@@ -252,6 +253,9 @@ DB_PASSWORD=your-secure-password
 DB_NAME=strive
 DB_SSL_MODE=require
 JWT_SECRET=your-very-secure-jwt-secret
+JWT_ISSUER=strive-api
+JWT_AUDIENCE=strive-app
+JWT_CLOCK_SKEW=2m
 ```
 
 ## 🤝 Contributing
