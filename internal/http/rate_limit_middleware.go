@@ -130,7 +130,7 @@ func (rl *RateLimiter) RateLimitMiddleware() func(http.Handler) http.Handler {
 			clientID := getClientIP(r)
 			limit := rl.config.GeneralRequestsPerMinute
 
-			if isAuthEndpoint(r.URL.Path) {
+			if IsAuthEndpoint(r.URL.Path) {
 				limit = rl.config.AuthRequestsPerMinute
 			}
 
@@ -144,7 +144,7 @@ func (rl *RateLimiter) RateLimitMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
-func isAuthEndpoint(path string) bool {
+func IsAuthEndpoint(path string) bool {
 	authPaths := []string{
 		"/api/v1/auth/login",
 		"/api/v1/auth/register",

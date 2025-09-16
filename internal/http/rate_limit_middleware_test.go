@@ -9,6 +9,8 @@ import (
 	"github.com/aleksandr/strive-api/internal/logger"
 )
 
+const testClientIP = "192.168.1.1:12345"
+
 func TestRateLimiter_GeneralRequests(t *testing.T) {
 	cfg := &config.RateLimitConfig{
 		AuthRequestsPerMinute:    5,
@@ -22,12 +24,12 @@ func TestRateLimiter_GeneralRequests(t *testing.T) {
 
 	handler := rateLimiter.RateLimitMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 
 	// Test general endpoint
-	req := httptest.NewRequest("GET", "/health", nil)
-	req.RemoteAddr = "192.168.1.1:12345"
+	req := httptest.NewRequest("GET", "/health", http.NoBody)
+	req.RemoteAddr = testClientIP
 
 	// First 3 requests should succeed
 	for i := 0; i < 3; i++ {
@@ -59,12 +61,12 @@ func TestRateLimiter_AuthRequests(t *testing.T) {
 
 	handler := rateLimiter.RateLimitMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 
 	// Test auth endpoint
-	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
-	req.RemoteAddr = "192.168.1.1:12345"
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", http.NoBody)
+	req.RemoteAddr = testClientIP
 
 	// First 2 requests should succeed
 	for i := 0; i < 2; i++ {
@@ -96,11 +98,11 @@ func TestRateLimiter_Disabled(t *testing.T) {
 
 	handler := rateLimiter.RateLimitMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 
-	req := httptest.NewRequest("GET", "/health", nil)
-	req.RemoteAddr = "192.168.1.1:12345"
+	req := httptest.NewRequest("GET", "/health", http.NoBody)
+	req.RemoteAddr = testClientIP
 
 	// All requests should succeed when rate limiting is disabled
 	for i := 0; i < 10; i++ {
@@ -125,14 +127,14 @@ func TestRateLimiter_DifferentClients(t *testing.T) {
 
 	handler := rateLimiter.RateLimitMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}))
 
 	// Test with different client IPs
-	client1Req := httptest.NewRequest("GET", "/health", nil)
-	client1Req.RemoteAddr = "192.168.1.1:12345"
+	client1Req := httptest.NewRequest("GET", "/health", http.NoBody)
+	client1Req.RemoteAddr = testClientIP
 
-	client2Req := httptest.NewRequest("GET", "/health", nil)
+	client2Req := httptest.NewRequest("GET", "/health", http.NoBody)
 	client2Req.RemoteAddr = "192.168.1.2:12345"
 
 	// Both clients should be able to make requests independently
@@ -168,7 +170,7 @@ func TestIsAuthEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			result := isAuthEndpoint(tt.path)
+			result := IsAuthEndpoint(tt.path)
 			if result != tt.expected {
 				t.Errorf("isAuthEndpoint(%s) = %v, expected %v", tt.path, result, tt.expected)
 			}
