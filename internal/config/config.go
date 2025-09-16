@@ -67,7 +67,7 @@ func Load() (*Config, error) {
 			MinConns: int32(getEnvInt("DB_MIN_CONNS", 5)),
 		},
 		JWT: JWTConfig{
-			Secret:    getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+			Secret:    getEnv("JWT_SECRET", ""),
 			Issuer:    getEnv("JWT_ISSUER", "strive-api"),
 			Audience:  getEnv("JWT_AUDIENCE", "strive-app"),
 			ClockSkew: getEnvDuration("JWT_CLOCK_SKEW", 2*time.Minute),
@@ -114,6 +114,14 @@ func (c *Config) Validate() error {
 
 	if c.DB.MinConns < 0 || c.DB.MinConns > c.DB.MaxConns {
 		return fmt.Errorf("invalid min connections: %d", c.DB.MinConns)
+	}
+
+	if c.JWT.Secret == "" {
+		return fmt.Errorf("JWT_SECRET is required")
+	}
+
+	if len(c.JWT.Secret) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters long")
 	}
 
 	return nil
