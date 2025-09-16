@@ -130,6 +130,14 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid min connections: %d", c.DB.MinConns)
 	}
 
+	if c.JWT.Secret == "" {
+		return fmt.Errorf("JWT_SECRET is required")
+	}
+
+	if len(c.JWT.Secret) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters long")
+	}
+
 	return nil
 }
 

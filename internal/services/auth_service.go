@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aleksandr/strive-api/internal/config"
@@ -53,8 +54,13 @@ func NewAuthService(userRepo repositories.UserRepository, jwtConfig *config.JWTC
 	}
 }
 
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 func (s *authService) Register(ctx context.Context, req *models.CreateUserRequest) (*models.User, error) {
-	existingUser, err := s.userRepo.GetByEmail(ctx, req.Email)
+	normalizedEmail := normalizeEmail(req.Email)
+	existingUser, err := s.userRepo.GetByEmail(ctx, normalizedEmail)
 	if err == nil && existingUser != nil {
 		return nil, fmt.Errorf("user with email %s already exists", req.Email)
 	}
@@ -66,7 +72,7 @@ func (s *authService) Register(ctx context.Context, req *models.CreateUserReques
 
 	user := &models.User{
 		ID:           uuid.New(),
-		Email:        req.Email,
+		Email:        normalizedEmail,
 		PasswordHash: hashedPassword,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -80,7 +86,8 @@ func (s *authService) Register(ctx context.Context, req *models.CreateUserReques
 }
 
 func (s *authService) Login(ctx context.Context, email, password string) (string, string, error) {
-	user, err := s.userRepo.GetByEmail(ctx, email)
+	normalizedEmail := normalizeEmail(email)
+	user, err := s.userRepo.GetByEmail(ctx, normalizedEmail)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid credentials")
 	}
