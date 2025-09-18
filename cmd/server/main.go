@@ -164,13 +164,16 @@ func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, 
 }
 
 func applyMiddleware(mux *http.ServeMux, logger *logger.Logger, cfg *config.Config) http.Handler {
-	corsMiddleware := httphandler.NewCORSMiddleware()
+	corsMiddleware := httphandler.NewCORSMiddleware(&cfg.CORS)
 	rateLimiter := httphandler.NewRateLimiter(&cfg.RateLimit, logger)
+	securityHeadersMiddleware := httphandler.NewSecurityHeadersMiddleware(&cfg.SecurityHeaders)
 
 	return corsMiddleware(
 		rateLimiter.RateLimitMiddleware()(
-			httphandler.LoggingMiddleware(logger)(
-				httphandler.RequestIDMiddleware()(mux),
+			securityHeadersMiddleware(
+				httphandler.LoggingMiddleware(logger)(
+					httphandler.RequestIDMiddleware()(mux),
+				),
 			),
 		),
 	)

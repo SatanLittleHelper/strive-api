@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	Server    ServerConfig
-	Log       LogConfig
-	DB        DatabaseConfig
-	JWT       JWTConfig
-	RateLimit RateLimitConfig
+	Server          ServerConfig
+	Log             LogConfig
+	DB              DatabaseConfig
+	JWT             JWTConfig
+	RateLimit       RateLimitConfig
+	CORS            CORSConfig
+	SecurityHeaders SecurityHeadersConfig
 }
 
 type ServerConfig struct {
@@ -52,6 +55,25 @@ type RateLimitConfig struct {
 	Enabled                  bool
 }
 
+type CORSConfig struct {
+	AllowedOrigins   []string
+	AllowedMethods   []string
+	AllowedHeaders   []string
+	ExposedHeaders   []string
+	AllowCredentials bool
+	MaxAge           int
+}
+
+type SecurityHeadersConfig struct {
+	HSTSMaxAge            int
+	HSTSIncludeSubdomains bool
+	CSPDirective          string
+	XFrameOptions         string
+	XContentTypeOptions   string
+	ReferrerPolicy        string
+	XSSProtection         string
+}
+
 func Load() (*Config, error) {
 	config := &Config{
 		Server: ServerConfig{
@@ -85,6 +107,23 @@ func Load() (*Config, error) {
 			GeneralRequestsPerMinute: getEnvInt("RATE_LIMIT_GENERAL_PER_MINUTE", 60),
 			BurstSize:                getEnvInt("RATE_LIMIT_BURST_SIZE", 10),
 			Enabled:                  getEnv("RATE_LIMIT_ENABLED", "true") == "true",
+		},
+		CORS: CORSConfig{
+			AllowedOrigins:   getEnvSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:4200", "http://127.0.0.1:4200", "http://192.168.1.186:4200", "https://satanlittlehelper.github.io"}),
+			AllowedMethods:   getEnvSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
+			AllowedHeaders:   getEnvSlice("CORS_ALLOWED_HEADERS", []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"}),
+			ExposedHeaders:   getEnvSlice("CORS_EXPOSED_HEADERS", []string{"X-Request-ID"}),
+			AllowCredentials: getEnv("CORS_ALLOW_CREDENTIALS", "true") == "true",
+			MaxAge:           getEnvInt("CORS_MAX_AGE", 86400),
+		},
+		SecurityHeaders: SecurityHeadersConfig{
+			HSTSMaxAge:            getEnvInt("SECURITY_HSTS_MAX_AGE", 31536000),
+			HSTSIncludeSubdomains: getEnv("SECURITY_HSTS_INCLUDE_SUBDOMAINS", "true") == "true",
+			CSPDirective:          getEnv("SECURITY_CSP_DIRECTIVE", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"),
+			XFrameOptions:         getEnv("SECURITY_X_FRAME_OPTIONS", "DENY"),
+			XContentTypeOptions:   getEnv("SECURITY_X_CONTENT_TYPE_OPTIONS", "nosniff"),
+			ReferrerPolicy:        getEnv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"),
+			XSSProtection:         getEnv("SECURITY_XSS_PROTECTION", "1; mode=block"),
 		},
 	}
 
@@ -167,6 +206,13 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		if duration, err := time.ParseDuration(value); err == nil {
 			return duration
 		}
+	}
+	return defaultValue
+}
+
+func getEnvSlice(key string, defaultValue []string) []string {
+	if value := os.Getenv(key); value != "" {
+		return strings.Split(value, ",")
 	}
 	return defaultValue
 }

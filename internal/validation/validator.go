@@ -62,7 +62,9 @@ func ValidatePassword(password string) error {
 		return fmt.Errorf("password too long (max 128 characters)")
 	}
 
-	var hasUpper, hasLower, hasDigit bool
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
+	specialChars := "!@#$%^&*()_+-=[]{}|;:,.<>?"
+
 	for _, char := range password {
 		switch {
 		case unicode.IsUpper(char):
@@ -71,6 +73,8 @@ func ValidatePassword(password string) error {
 			hasLower = true
 		case unicode.IsDigit(char):
 			hasDigit = true
+		case strings.ContainsRune(specialChars, char):
+			hasSpecial = true
 		}
 	}
 
@@ -82,6 +86,9 @@ func ValidatePassword(password string) error {
 	}
 	if !hasDigit {
 		return fmt.Errorf("password must contain at least one digit")
+	}
+	if !hasSpecial {
+		return fmt.Errorf("password must contain at least one special character")
 	}
 
 	return nil
