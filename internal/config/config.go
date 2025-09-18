@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+const (
+	trueStr = "true"
+)
+
 type Config struct {
 	Server          ServerConfig
 	Log             LogConfig
@@ -106,24 +110,31 @@ func Load() (*Config, error) {
 			AuthRequestsPerMinute:    getEnvInt("RATE_LIMIT_AUTH_PER_MINUTE", 5),
 			GeneralRequestsPerMinute: getEnvInt("RATE_LIMIT_GENERAL_PER_MINUTE", 60),
 			BurstSize:                getEnvInt("RATE_LIMIT_BURST_SIZE", 10),
-			Enabled:                  getEnv("RATE_LIMIT_ENABLED", "true") == "true",
+			Enabled:                  getEnv("RATE_LIMIT_ENABLED", trueStr) == trueStr,
 		},
 		CORS: CORSConfig{
-			AllowedOrigins:   getEnvSlice("CORS_ALLOWED_ORIGINS", []string{"http://localhost:4200", "http://127.0.0.1:4200", "http://192.168.1.186:4200", "https://satanlittlehelper.github.io"}),
+			AllowedOrigins: getEnvSlice("CORS_ALLOWED_ORIGINS", []string{
+				"http://localhost:4200", "http://127.0.0.1:4200",
+				"http://192.168.1.186:4200", "https://satanlittlehelper.github.io",
+			}),
 			AllowedMethods:   getEnvSlice("CORS_ALLOWED_METHODS", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
 			AllowedHeaders:   getEnvSlice("CORS_ALLOWED_HEADERS", []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"}),
 			ExposedHeaders:   getEnvSlice("CORS_EXPOSED_HEADERS", []string{"X-Request-ID"}),
-			AllowCredentials: getEnv("CORS_ALLOW_CREDENTIALS", "true") == "true",
+			AllowCredentials: getEnv("CORS_ALLOW_CREDENTIALS", trueStr) == trueStr,
 			MaxAge:           getEnvInt("CORS_MAX_AGE", 86400),
 		},
 		SecurityHeaders: SecurityHeadersConfig{
 			HSTSMaxAge:            getEnvInt("SECURITY_HSTS_MAX_AGE", 31536000),
-			HSTSIncludeSubdomains: getEnv("SECURITY_HSTS_INCLUDE_SUBDOMAINS", "true") == "true",
-			CSPDirective:          getEnv("SECURITY_CSP_DIRECTIVE", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"),
-			XFrameOptions:         getEnv("SECURITY_X_FRAME_OPTIONS", "DENY"),
-			XContentTypeOptions:   getEnv("SECURITY_X_CONTENT_TYPE_OPTIONS", "nosniff"),
-			ReferrerPolicy:        getEnv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"),
-			XSSProtection:         getEnv("SECURITY_XSS_PROTECTION", "1; mode=block"),
+			HSTSIncludeSubdomains: getEnv("SECURITY_HSTS_INCLUDE_SUBDOMAINS", trueStr) == trueStr,
+			CSPDirective: getEnv("SECURITY_CSP_DIRECTIVE",
+				"default-src 'self'; script-src 'self' 'unsafe-inline'; "+
+					"style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; "+
+					"font-src 'self'; connect-src 'self'; frame-ancestors 'none'; "+
+					"base-uri 'self'; form-action 'self'"),
+			XFrameOptions:       getEnv("SECURITY_X_FRAME_OPTIONS", "DENY"),
+			XContentTypeOptions: getEnv("SECURITY_X_CONTENT_TYPE_OPTIONS", "nosniff"),
+			ReferrerPolicy:      getEnv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"),
+			XSSProtection:       getEnv("SECURITY_XSS_PROTECTION", "1; mode=block"),
 		},
 	}
 
