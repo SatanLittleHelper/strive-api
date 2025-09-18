@@ -28,7 +28,7 @@ func TestAuthHandlers_Register(t *testing.T) {
 			name: "successful registration",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "Password123",
+				"password": "Password123!",
 			},
 			mockSetup: func(m *MockAuthService) {
 				user := &models.User{
@@ -54,7 +54,7 @@ func TestAuthHandlers_Register(t *testing.T) {
 			name: "service error",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "Password123",
+				"password": "Password123!",
 			},
 			mockSetup: func(m *MockAuthService) {
 				m.On("Register", mock.Anything, mock.AnythingOfType("*models.CreateUserRequest")).
@@ -113,10 +113,10 @@ func TestAuthHandlers_Login(t *testing.T) {
 			name: "successful login",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "password123",
+				"password": "Password123!",
 			},
 			mockSetup: func(m *MockAuthService) {
-				m.On("Login", mock.Anything, "test@example.com", "password123").
+				m.On("Login", mock.Anything, "test@example.com", "Password123!").
 					Return("access_token", "refresh_token", nil)
 			},
 			expectedStatus: http.StatusOK,
@@ -126,10 +126,10 @@ func TestAuthHandlers_Login(t *testing.T) {
 			name: "invalid credentials",
 			requestBody: map[string]string{
 				"email":    "test@example.com",
-				"password": "wrongpassword",
+				"password": "WrongPassword123!",
 			},
 			mockSetup: func(m *MockAuthService) {
-				m.On("Login", mock.Anything, "test@example.com", "wrongpassword").
+				m.On("Login", mock.Anything, "test@example.com", "WrongPassword123!").
 					Return("", "", assert.AnError)
 			},
 			expectedStatus: http.StatusUnauthorized,

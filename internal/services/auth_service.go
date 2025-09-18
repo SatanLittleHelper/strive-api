@@ -89,10 +89,12 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	normalizedEmail := normalizeEmail(email)
 	user, err := s.userRepo.GetByEmail(ctx, normalizedEmail)
 	if err != nil {
+		s.addLoginDelay()
 		return "", "", fmt.Errorf("invalid credentials")
 	}
 
 	if err := s.VerifyPassword(user.PasswordHash, password); err != nil {
+		s.addLoginDelay()
 		return "", "", fmt.Errorf("invalid credentials")
 	}
 
@@ -211,4 +213,8 @@ func (s *authService) generateToken(user *models.User, ttl time.Duration) (strin
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.config.Secret))
+}
+
+func (s *authService) addLoginDelay() {
+	time.Sleep(500 * time.Millisecond)
 }

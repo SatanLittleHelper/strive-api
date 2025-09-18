@@ -1,3 +1,9 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
 # Strive API - Архитектура Проекта
 
 ## Обзор
@@ -100,8 +106,10 @@ strive-api/
 - **AuthMiddleware**: Расширенная проверка JWT токенов с детальными ошибками
 - **LoggingMiddleware**: Логирование запросов
 - **RequestIDMiddleware**: Трассировка запросов
-- **CORSMiddleware**: CORS политики
-- **SecurityMiddleware**: Безопасность (rate limiting, etc.)
+- **CORSMiddleware**: CORS политики (настраиваемые через ENV)
+- **RateLimitMiddleware**: Защита от брутфорс атак
+- **SecurityHeadersMiddleware**: HTTP заголовки безопасности (HSTS, CSP, X-Frame-Options)
+- **SecurityMiddleware**: Логирование событий безопасности
 
 ### 4. Модели (internal/models/)
 
@@ -175,7 +183,7 @@ type UserRepository interface {
 
 Валидация входных данных:
 - Email валидация
-- Пароль валидация (минимум 8 символов)
+- Пароль валидация (минимум 8 символов, специальные символы, заглавные/строчные буквы, цифры)
 - Структурированные ошибки валидации
 
 ### 8. Логирование (internal/logger/)
@@ -242,8 +250,33 @@ DB_SSL_MODE=disable
 DB_MAX_CONNS=25
 DB_MIN_CONNS=5
 
-# JWT
-JWT_SECRET=your-secret-key-change-in-production
+# JWT (ОБЯЗАТЕЛЬНО: минимум 32 символа)
+JWT_SECRET=your-very-secure-jwt-secret-32-chars-minimum
+JWT_ISSUER=strive-api
+JWT_AUDIENCE=strive-app
+JWT_CLOCK_SKEW=2m
+
+# Rate Limiting
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_AUTH_PER_MINUTE=5
+RATE_LIMIT_GENERAL_PER_MINUTE=60
+RATE_LIMIT_BURST_SIZE=10
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:4200,https://satanlittlehelper.github.io
+CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
+CORS_ALLOWED_HEADERS=Accept,Authorization,Content-Type,X-Request-ID
+CORS_ALLOW_CREDENTIALS=true
+CORS_MAX_AGE=86400
+
+# Security Headers
+SECURITY_HSTS_MAX_AGE=31536000
+SECURITY_HSTS_INCLUDE_SUBDOMAINS=true
+SECURITY_CSP_DIRECTIVE=default-src 'self'; script-src 'self' 'unsafe-inline'
+SECURITY_X_FRAME_OPTIONS=DENY
+SECURITY_X_CONTENT_TYPE_OPTIONS=nosniff
+SECURITY_REFERRER_POLICY=strict-origin-when-cross-origin
+SECURITY_XSS_PROTECTION=1; mode=block
 ```
 
 ## Тестирование
@@ -279,16 +312,19 @@ make run-dev           # Запуск с dev окружением
 ### Реализованные меры:
 - JWT токены для аутентификации с расширенной валидацией
 - bcrypt для хеширования паролей
-- CORS middleware
+- CORS middleware (настраиваемый через ENV)
+- Rate limiting для защиты от брутфорс атак
+- HTTP Security Headers (HSTS, CSP, X-Frame-Options, etc.)
 - Request ID для трассировки
 - Структурированное логирование инцидентов безопасности
-- Валидация всех входных данных
+- Валидация всех входных данных с усиленными требованиями к паролям
 - Проверка iss/aud в JWT токенах
 - Clock skew для синхронизации времени
-- Детальные коды ошибок аутентификации
+- Унифицированные сообщения об ошибках аутентификации
+- Защита от timing атак с задержками
 
 ### Планируемые улучшения:
-- Rate limiting
+- CSRF защита
 - Request size limits
 - Input sanitization
 - SQL injection protection (уже частично через pgx)
