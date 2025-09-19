@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 
@@ -111,7 +110,7 @@ func setupRoutes(handlers *Handlers, logger *logger.Logger, authService services
 	setupPublicRoutes(mux, handlers)
 
 	// Setup protected routes
-	setupProtectedRoutes(mux, authService, logger)
+	setupProtectedRoutes(mux, authService, logger, handlers)
 
 	// Apply middleware
 	return applyMiddleware(mux, logger, cfg)
@@ -133,35 +132,14 @@ func setupPublicRoutes(mux *http.ServeMux, handlers *Handlers) {
 	mux.HandleFunc("/swagger/", httpSwagger.WrapHandler)
 }
 
-func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, logger *logger.Logger) {
-	// Create protected sub-router
+func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, logger *logger.Logger, handlers *Handlers) {
 	protectedMux := http.NewServeMux()
 
-	// Protected endpoints
-	protectedMux.HandleFunc("/profile", func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := httphandler.GetUserIDFromContext(r.Context())
-		if !ok {
-			http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
-			return
-		}
+	protectedMux.HandleFunc("/me", handlers.Auth.Me)
 
-		userEmail, _ := httphandler.GetUserEmailFromContext(r.Context())
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		response := map[string]interface{}{
-			"message": "This is a protected endpoint",
-			"user_id": userID,
-			"email":   userEmail,
-		}
-		_ = json.NewEncoder(w).Encode(response)
-	})
-
-	// Apply auth middleware to protected routes
 	protectedHandler := httphandler.AuthMiddleware(authService, logger)(protectedMux)
 
-	// Mount protected routes
-	mux.Handle("/api/v1/user/", http.StripPrefix("/api/v1/user", protectedHandler))
+	mux.Handle("/api/v1/auth/", http.StripPrefix("/api/v1/auth", protectedHandler))
 }
 
 func applyMiddleware(mux *http.ServeMux, logger *logger.Logger, cfg *config.Config) http.Handler {
