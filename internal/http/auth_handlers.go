@@ -11,6 +11,10 @@ import (
 	"github.com/aleksandr/strive-api/internal/validation"
 )
 
+const (
+	productionEnv = "production"
+)
+
 type AuthHandlers struct {
 	authService    services.AuthService
 	logger         *logger.Logger
@@ -25,8 +29,17 @@ func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *A
 	}
 }
 
+func getCookieSettings() (secure bool, sameSite http.SameSite) {
+	isProduction := os.Getenv("ENVIRONMENT") == productionEnv
+
+	if isProduction {
+		return true, http.SameSiteNoneMode // HTTPS + cross-site support
+	}
+	return false, http.SameSiteLaxMode // HTTP + same-site only
+}
+
 func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
-	secure := os.Getenv("ENVIRONMENT") == "production"
+	secure, sameSite := getCookieSettings()
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,
@@ -34,7 +47,7 @@ func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
 		Path:     "/",
 		Secure:   secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		MaxAge:   maxAge,
 	})
 }
