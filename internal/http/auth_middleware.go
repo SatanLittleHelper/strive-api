@@ -56,21 +56,31 @@ func logAuthFailure(log *logger.Logger, r *http.Request, reason string) {
 func AuthMiddleware(authService services.AuthService, log *logger.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var tokenString string
+			var authSource string
+
+			// Try to get token from Authorization header first
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				writeAuthError(w, log, r, "UNAUTHORIZED", "Authorization header required", "missing_auth_header")
-				return
+			if authHeader != "" {
+				parts := strings.SplitN(authHeader, " ", 2)
+				if len(parts) == 2 && parts[0] == "Bearer" && parts[1] != "" {
+					tokenString = parts[1]
+					authSource = "header"
+				}
 			}
 
-			parts := strings.SplitN(authHeader, " ", 2)
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				writeAuthError(w, log, r, "BEARER_REQUIRED", "Bearer token required", "invalid_auth_format")
-				return
-			}
-
-			tokenString := parts[1]
+			// If no token in header, try to get from cookie
 			if tokenString == "" {
-				writeAuthError(w, log, r, "TOKEN_EMPTY", "Token cannot be empty", "empty_token")
+				accessTokenCookie, err := r.Cookie("access-token")
+				if err == nil && accessTokenCookie.Value != "" {
+					tokenString = accessTokenCookie.Value
+					authSource = "cookie"
+				}
+			}
+
+			// If still no token, return error
+			if tokenString == "" {
+				writeAuthError(w, log, r, "UNAUTHORIZED", "Authentication required", "missing_token")
 				return
 			}
 
@@ -96,6 +106,12 @@ func AuthMiddleware(authService services.AuthService, log *logger.Logger) func(h
 				writeAuthError(w, log, r, code, message, reason)
 				return
 			}
+
+			// Log successful authentication with source
+			log.Debug("Authentication successful",
+				"user_id", claims.UserID,
+				"email", claims.Email,
+				"source", authSource)
 
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID.String())
 			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)

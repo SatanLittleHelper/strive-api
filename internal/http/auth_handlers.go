@@ -24,32 +24,40 @@ func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *A
 	}
 }
 
-// RegisterRequest represents user registration data
+func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   maxAge,
+	})
+}
+
 type RegisterRequest struct {
 	Email    string `json:"email" validate:"required,email" example:"user@example.com"`
 	Password string `json:"password" validate:"required,min=8" example:"password123"`
 }
 
-// LoginRequest represents user login credentials
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email" example:"user@example.com"`
 	Password string `json:"password" validate:"required" example:"password123"`
 }
 
-// RefreshRequest represents refresh token request
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 }
 
-// AuthResponse represents authentication response
 type AuthResponse struct {
-	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	AccessToken  string `json:"access_token,omitempty" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	RefreshToken string `json:"refresh_token,omitempty" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 	ExpiresIn    int    `json:"expires_in" example:"900"`
 	TokenType    string `json:"token_type" example:"Bearer"`
+	Message      string `json:"message,omitempty" example:"Login successful"`
 }
 
-// ErrorResponse represents API error response
 type ErrorResponse struct {
 	Error struct {
 		Code    string `json:"code" example:"VALIDATION_ERROR"`
@@ -183,11 +191,13 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("User logged in successfully", "email", req.Email)
 
+	setSecureCookie(w, "access-token", accessToken, 900)
+	setSecureCookie(w, "refresh-token", refreshToken, 604800)
+
 	response := AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    900,
-		TokenType:    "Bearer",
+		ExpiresIn: 900,
+		TokenType: "Bearer",
+		Message:   "Login successful",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -197,31 +207,31 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 
 // Refresh godoc
 // @Summary Refresh access token
-// @Description Refresh access token using refresh token
+// @Description Refresh access token using refresh token from cookie
 // @Tags authentication
 // @Accept json
 // @Produce json
-// @Param request body RefreshRequest true "Refresh token data"
 // @Success 200 {object} AuthResponse "Token refreshed successfully"
 // @Failure 400 {object} ErrorResponse "Invalid request data"
 // @Failure 401 {object} ErrorResponse "Invalid refresh token"
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
-	var req RefreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Error("Failed to decode refresh request", "error", err)
-		http.Error(w, `{"error":{"code":"INVALID_REQUEST","message":"Invalid JSON"}}`, http.StatusBadRequest)
+	refreshTokenCookie, err := r.Cookie("refresh-token")
+	if err != nil {
+		h.logger.Warn("Refresh token cookie not found")
+		h.securityLogger.LogFailedAuth(r, "missing_refresh_token_cookie")
+		http.Error(w, `{"error":{"code":"MISSING_REFRESH_TOKEN","message":"Refresh token cookie not found"}}`, http.StatusUnauthorized)
 		return
 	}
 
-	if req.RefreshToken == "" {
-		h.logger.Warn("Empty refresh token provided")
-		h.securityLogger.LogInvalidInput(r, []string{"refresh_token is required"})
-		http.Error(w, `{"error":{"code":"VALIDATION_ERROR","message":"refresh_token is required"}}`, http.StatusBadRequest)
+	if refreshTokenCookie.Value == "" {
+		h.logger.Warn("Empty refresh token in cookie")
+		h.securityLogger.LogInvalidInput(r, []string{"refresh_token is empty"})
+		http.Error(w, `{"error":{"code":"INVALID_REFRESH_TOKEN","message":"Refresh token is empty"}}`, http.StatusBadRequest)
 		return
 	}
 
-	accessToken, refreshToken, err := h.authService.RefreshToken(r.Context(), req.RefreshToken)
+	accessToken, refreshToken, err := h.authService.RefreshToken(r.Context(), refreshTokenCookie.Value)
 	if err != nil {
 		h.logger.Error("Failed to refresh token", "error", err)
 		h.securityLogger.LogFailedAuth(r, "invalid_refresh_token")
@@ -231,11 +241,36 @@ func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("Token refreshed successfully")
 
+	setSecureCookie(w, "access-token", accessToken, 900)
+	setSecureCookie(w, "refresh-token", refreshToken, 604800)
+
 	response := AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    900,
-		TokenType:    "Bearer",
+		ExpiresIn: 900,
+		TokenType: "Bearer",
+		Message:   "Token refreshed successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
+}
+
+// Logout godoc
+// @Summary Logout user
+// @Description Logout user and clear authentication cookies
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Logout successful"
+// @Router /api/v1/auth/logout [post]
+func (h *AuthHandlers) Logout(w http.ResponseWriter, r *http.Request) {
+	setSecureCookie(w, "access-token", "", -1)
+	setSecureCookie(w, "refresh-token", "", -1)
+
+	h.logger.Info("User logged out successfully")
+
+	response := map[string]interface{}{
+		"message": "Logout successful",
 	}
 
 	w.Header().Set("Content-Type", "application/json")

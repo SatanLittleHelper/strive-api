@@ -69,7 +69,7 @@ func TestAuthMiddleware(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 		assert.Equal(t, "UNAUTHORIZED", response.Error.Code)
-		assert.Equal(t, "Authorization header required", response.Error.Message)
+		assert.Equal(t, "Authentication required", response.Error.Message)
 	})
 
 	t.Run("InvalidBearerFormat", func(t *testing.T) {
@@ -91,7 +91,7 @@ func TestAuthMiddleware(t *testing.T) {
 		var response AuthError
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Equal(t, "BEARER_REQUIRED", response.Error.Code)
+		assert.Equal(t, "UNAUTHORIZED", response.Error.Code)
 	})
 
 	t.Run("EmptyToken", func(t *testing.T) {
@@ -113,7 +113,7 @@ func TestAuthMiddleware(t *testing.T) {
 		var response AuthError
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Equal(t, "TOKEN_EMPTY", response.Error.Code)
+		assert.Equal(t, "UNAUTHORIZED", response.Error.Code)
 	})
 
 	t.Run("ExpiredToken", func(t *testing.T) {

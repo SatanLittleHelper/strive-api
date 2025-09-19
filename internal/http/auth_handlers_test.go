@@ -14,6 +14,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
+	for _, cookie := range cookies {
+		if cookie.Name == name {
+			return cookie
+		}
+	}
+	return nil
+}
+
 func TestAuthHandlers_Register(t *testing.T) {
 	logger := logger.New("INFO", "json")
 
@@ -168,11 +177,15 @@ func TestAuthHandlers_Login(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Contains(t, response, "error")
 			} else {
-				var response map[string]interface{}
-				err := json.Unmarshal(rr.Body.Bytes(), &response)
-				assert.NoError(t, err)
-				assert.Contains(t, response, "access_token")
-				assert.Contains(t, response, "refresh_token")
+				// Check that cookies are set instead of JSON tokens
+				cookies := rr.Result().Cookies()
+				accessTokenCookie := findCookie(cookies, "access-token")
+				refreshTokenCookie := findCookie(cookies, "refresh-token")
+
+				assert.NotNil(t, accessTokenCookie, "access-token cookie should be set")
+				assert.NotNil(t, refreshTokenCookie, "refresh-token cookie should be set")
+				assert.Equal(t, "access_token", accessTokenCookie.Value)
+				assert.Equal(t, "refresh_token", refreshTokenCookie.Value)
 			}
 
 			mockService.AssertExpectations(t)
