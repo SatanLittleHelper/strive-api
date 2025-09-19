@@ -30,8 +30,7 @@ func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *A
 }
 
 func getCookieSettings() bool {
-	isProduction := os.Getenv("ENVIRONMENT") == productionEnv
-	return isProduction
+	return os.Getenv("ENVIRONMENT") == productionEnv
 }
 
 func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
@@ -43,7 +42,7 @@ func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
 		Path:     "/",
 		Secure:   secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		MaxAge:   maxAge,
 	}
 
