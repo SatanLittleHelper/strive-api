@@ -46,7 +46,7 @@ func main() {
 
 	// Initialize services and handlers
 	authService := setupServices(db, cfg)
-	handlers := setupHandlers(authService, logger, db)
+	handlers := setupHandlers(authService, logger, db, cfg)
 
 	// Setup routes and middleware
 	handler := setupRoutes(handlers, logger, authService, cfg)
@@ -87,7 +87,8 @@ func runMigrations(cfg *config.Config, logger *logger.Logger) {
 
 func setupServices(db *database.Database, cfg *config.Config) services.AuthService {
 	userRepo := repositories.NewUserRepository(db.Pool())
-	authService := services.NewAuthService(userRepo, &cfg.JWT)
+	refreshTokenRepo := repositories.NewRefreshTokenRepository(db.Pool())
+	authService := services.NewAuthService(userRepo, refreshTokenRepo, &cfg.JWT)
 	return authService
 }
 
@@ -96,9 +97,9 @@ type Handlers struct {
 	Health *httphandler.DetailedHealthHandler
 }
 
-func setupHandlers(authService services.AuthService, logger *logger.Logger, db *database.Database) *Handlers {
+func setupHandlers(authService services.AuthService, logger *logger.Logger, db *database.Database, cfg *config.Config) *Handlers {
 	return &Handlers{
-		Auth:   httphandler.NewAuthHandlers(authService, logger),
+		Auth:   httphandler.NewAuthHandlers(authService, logger, cfg),
 		Health: httphandler.NewDetailedHealthHandler(logger, db.Pool()),
 	}
 }

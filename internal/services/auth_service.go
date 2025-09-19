@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -30,6 +32,7 @@ type AuthService interface {
 	ValidateToken(tokenString string) (*Claims, error)
 	HashPassword(password string) (string, error)
 	VerifyPassword(hashedPassword, password string) error
+	Logout(ctx context.Context, refreshToken string) error
 }
 
 type Claims struct {
@@ -39,18 +42,24 @@ type Claims struct {
 }
 
 type authService struct {
-	userRepo   repositories.UserRepository
-	config     *config.JWTConfig
-	accessTTL  time.Duration
-	refreshTTL time.Duration
+	userRepo         repositories.UserRepository
+	refreshTokenRepo repositories.RefreshTokenRepository
+	config           *config.JWTConfig
+	accessTTL        time.Duration
+	refreshTTL       time.Duration
 }
 
-func NewAuthService(userRepo repositories.UserRepository, jwtConfig *config.JWTConfig) AuthService {
+func NewAuthService(
+	userRepo repositories.UserRepository,
+	refreshTokenRepo repositories.RefreshTokenRepository,
+	jwtConfig *config.JWTConfig,
+) AuthService {
 	return &authService{
-		userRepo:   userRepo,
-		config:     jwtConfig,
-		accessTTL:  15 * time.Minute,
-		refreshTTL: 7 * 24 * time.Hour,
+		userRepo:         userRepo,
+		refreshTokenRepo: refreshTokenRepo,
+		config:           jwtConfig,
+		accessTTL:        15 * time.Minute,
+		refreshTTL:       7 * 24 * time.Hour,
 	}
 }
 
@@ -103,21 +112,34 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		return "", "", fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshToken, err := s.generateToken(user, s.refreshTTL)
+	refreshToken, err := s.generateRefreshToken()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	refreshTokenModel := &models.RefreshToken{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		Token:     refreshToken,
+		ExpiresAt: time.Now().Add(s.refreshTTL),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := s.refreshTokenRepo.Create(ctx, refreshTokenModel); err != nil {
+		return "", "", fmt.Errorf("failed to save refresh token: %w", err)
 	}
 
 	return accessToken, refreshToken, nil
 }
 
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
-	claims, err := s.ValidateToken(refreshToken)
+	refreshTokenModel, err := s.refreshTokenRepo.GetByToken(ctx, refreshToken)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid refresh token")
 	}
 
-	user, err := s.userRepo.GetByID(ctx, claims.UserID)
+	user, err := s.userRepo.GetByID(ctx, refreshTokenModel.UserID)
 	if err != nil {
 		return "", "", fmt.Errorf("user not found")
 	}
@@ -127,9 +149,26 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 		return "", "", fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	newRefreshToken, err := s.generateToken(user, s.refreshTTL)
+	newRefreshToken, err := s.generateRefreshToken()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	if err := s.refreshTokenRepo.Delete(ctx, refreshToken); err != nil {
+		return "", "", fmt.Errorf("failed to delete old refresh token: %w", err)
+	}
+
+	newRefreshTokenModel := &models.RefreshToken{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		Token:     newRefreshToken,
+		ExpiresAt: time.Now().Add(s.refreshTTL),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := s.refreshTokenRepo.Create(ctx, newRefreshTokenModel); err != nil {
+		return "", "", fmt.Errorf("failed to save new refresh token: %w", err)
 	}
 
 	return accessToken, newRefreshToken, nil
@@ -213,6 +252,21 @@ func (s *authService) generateToken(user *models.User, ttl time.Duration) (strin
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.config.Secret))
+}
+
+func (s *authService) generateRefreshToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func (s *authService) Logout(ctx context.Context, refreshToken string) error {
+	if err := s.refreshTokenRepo.Delete(ctx, refreshToken); err != nil {
+		return fmt.Errorf("failed to delete refresh token: %w", err)
+	}
+	return nil
 }
 
 func (s *authService) addLoginDelay() {

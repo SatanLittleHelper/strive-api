@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aleksandr/strive-api/internal/config"
 	"github.com/aleksandr/strive-api/internal/logger"
 	"github.com/aleksandr/strive-api/internal/models"
 	"github.com/google/uuid"
@@ -71,7 +72,8 @@ func TestAuthHandlers_Register(t *testing.T) {
 			mockService := new(MockAuthService)
 			tt.mockSetup(mockService)
 
-			handlers := NewAuthHandlers(mockService, logger)
+			cfg := &config.Config{}
+			handlers := NewAuthHandlers(mockService, logger, cfg)
 
 			body, _ := json.Marshal(tt.requestBody)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewReader(body))
@@ -152,7 +154,8 @@ func TestAuthHandlers_Login(t *testing.T) {
 			mockService := new(MockAuthService)
 			tt.mockSetup(mockService)
 
-			handlers := NewAuthHandlers(mockService, logger)
+			cfg := &config.Config{}
+			handlers := NewAuthHandlers(mockService, logger, cfg)
 
 			body, _ := json.Marshal(tt.requestBody)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
@@ -169,20 +172,22 @@ func TestAuthHandlers_Login(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Contains(t, response, "error")
 			} else {
-				// Check that cookies are set instead of JSON tokens
+				// Check that access token is in JSON response and refresh token is in cookie
+				var response map[string]interface{}
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Contains(t, response, "access_token")
+				assert.Equal(t, "access_token", response["access_token"])
+
 				cookies := rr.Result().Cookies()
-				var accessTokenCookie, refreshTokenCookie *http.Cookie
+				var refreshTokenCookie *http.Cookie
 				for _, cookie := range cookies {
-					if cookie.Name == "access-token" {
-						accessTokenCookie = cookie
-					} else if cookie.Name == "refresh-token" {
+					if cookie.Name == "refresh-token" {
 						refreshTokenCookie = cookie
 					}
 				}
 
-				assert.NotNil(t, accessTokenCookie, "access-token cookie should be set")
 				assert.NotNil(t, refreshTokenCookie, "refresh-token cookie should be set")
-				assert.Equal(t, "access_token", accessTokenCookie.Value)
 				assert.Equal(t, "refresh_token", refreshTokenCookie.Value)
 			}
 
@@ -215,7 +220,8 @@ func TestAuthHandlers_Me(t *testing.T) {
 			mockService := &MockAuthService{}
 			tt.mockSetup(mockService)
 
-			handlers := NewAuthHandlers(mockService, logger)
+			cfg := &config.Config{}
+			handlers := NewAuthHandlers(mockService, logger, cfg)
 
 			req := httptest.NewRequest("GET", "/api/v1/auth/me", http.NoBody)
 			rr := httptest.NewRecorder()

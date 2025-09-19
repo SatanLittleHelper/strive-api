@@ -55,9 +55,63 @@ func (m *mockUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return fmt.Errorf("user not found")
 }
 
+type mockRefreshTokenRepository struct {
+	tokens map[string]*models.RefreshToken
+}
+
+func (m *mockRefreshTokenRepository) Create(ctx context.Context, token *models.RefreshToken) error {
+	m.tokens[token.Token] = token
+	return nil
+}
+
+func (m *mockRefreshTokenRepository) GetByToken(ctx context.Context, token string) (*models.RefreshToken, error) {
+	refreshToken, exists := m.tokens[token]
+	if !exists {
+		return nil, fmt.Errorf("refresh token not found")
+	}
+	return refreshToken, nil
+}
+
+func (m *mockRefreshTokenRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*models.RefreshToken, error) {
+	var tokens []*models.RefreshToken
+	for _, token := range m.tokens {
+		if token.UserID == userID {
+			tokens = append(tokens, token)
+		}
+	}
+	return tokens, nil
+}
+
+func (m *mockRefreshTokenRepository) Delete(ctx context.Context, token string) error {
+	delete(m.tokens, token)
+	return nil
+}
+
+func (m *mockRefreshTokenRepository) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	for token, refreshToken := range m.tokens {
+		if refreshToken.UserID == userID {
+			delete(m.tokens, token)
+		}
+	}
+	return nil
+}
+
+func (m *mockRefreshTokenRepository) DeleteExpired(ctx context.Context) error {
+	now := time.Now()
+	for token, refreshToken := range m.tokens {
+		if refreshToken.ExpiresAt.Before(now) {
+			delete(m.tokens, token)
+		}
+	}
+	return nil
+}
+
 func TestAuthService_Register(t *testing.T) {
 	mockRepo := &mockUserRepository{
 		users: make(map[string]*models.User),
+	}
+	mockRefreshRepo := &mockRefreshTokenRepository{
+		tokens: make(map[string]*models.RefreshToken),
 	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
@@ -65,7 +119,7 @@ func TestAuthService_Register(t *testing.T) {
 		Audience:  "test-audience",
 		ClockSkew: 1 * time.Minute,
 	}
-	authService := NewAuthService(mockRepo, jwtConfig)
+	authService := NewAuthService(mockRepo, mockRefreshRepo, jwtConfig)
 
 	req := &models.CreateUserRequest{
 		Email:    "test@example.com",
@@ -94,13 +148,16 @@ func TestAuthService_Login(t *testing.T) {
 	mockRepo := &mockUserRepository{
 		users: make(map[string]*models.User),
 	}
+	mockRefreshRepo := &mockRefreshTokenRepository{
+		tokens: make(map[string]*models.RefreshToken),
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
 		Issuer:    "test-issuer",
 		Audience:  "test-audience",
 		ClockSkew: 1 * time.Minute,
 	}
-	authService := NewAuthService(mockRepo, jwtConfig)
+	authService := NewAuthService(mockRepo, mockRefreshRepo, jwtConfig)
 
 	// First register a user
 	req := &models.CreateUserRequest{
@@ -131,13 +188,16 @@ func TestAuthService_LoginCaseInsensitive(t *testing.T) {
 	mockRepo := &mockUserRepository{
 		users: make(map[string]*models.User),
 	}
+	mockRefreshRepo := &mockRefreshTokenRepository{
+		tokens: make(map[string]*models.RefreshToken),
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
 		Issuer:    "test-issuer",
 		Audience:  "test-audience",
 		ClockSkew: 1 * time.Minute,
 	}
-	authService := NewAuthService(mockRepo, jwtConfig)
+	authService := NewAuthService(mockRepo, mockRefreshRepo, jwtConfig)
 
 	// Register user with lowercase email
 	req := &models.CreateUserRequest{
@@ -168,13 +228,16 @@ func TestAuthService_HashPassword(t *testing.T) {
 	mockRepo := &mockUserRepository{
 		users: make(map[string]*models.User),
 	}
+	mockRefreshRepo := &mockRefreshTokenRepository{
+		tokens: make(map[string]*models.RefreshToken),
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
 		Issuer:    "test-issuer",
 		Audience:  "test-audience",
 		ClockSkew: 1 * time.Minute,
 	}
-	authService := NewAuthService(mockRepo, jwtConfig)
+	authService := NewAuthService(mockRepo, mockRefreshRepo, jwtConfig)
 
 	password := "testpassword123"
 	hashed, err := authService.HashPassword(password)
