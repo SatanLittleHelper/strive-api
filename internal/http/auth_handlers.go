@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"github.com/aleksandr/strive-api/internal/logger"
 	"github.com/aleksandr/strive-api/internal/models"
@@ -25,11 +26,13 @@ func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *A
 }
 
 func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
+	secure := os.Getenv("ENVIRONMENT") == "production"
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
