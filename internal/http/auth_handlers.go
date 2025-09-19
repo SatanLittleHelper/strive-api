@@ -33,9 +33,9 @@ func getCookieSettings() (secure bool, sameSite http.SameSite) {
 	isProduction := os.Getenv("ENVIRONMENT") == productionEnv
 
 	if isProduction {
-		return true, http.SameSiteNoneMode // HTTPS + cross-site support
+		return true, http.SameSiteLaxMode
 	}
-	return false, http.SameSiteLaxMode // HTTP + same-site only
+	return false, http.SameSiteNoneMode
 }
 
 func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
