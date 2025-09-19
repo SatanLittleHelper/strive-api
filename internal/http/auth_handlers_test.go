@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -206,4 +207,63 @@ func TestHealthHandler(t *testing.T) {
 	err := json.Unmarshal(rr.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.Equal(t, "ok", response["status"])
+}
+
+func TestAuthHandlers_Me(t *testing.T) {
+	logger := logger.New("INFO", "json")
+
+	tests := []struct {
+		name           string
+		mockSetup      func(m *MockAuthService)
+		expectedStatus int
+		expectedError  bool
+	}{
+		{
+			name: "successful me request",
+			mockSetup: func(m *MockAuthService) {
+				// No mock setup needed as Me doesn't call auth service
+			},
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := &MockAuthService{}
+			tt.mockSetup(mockService)
+
+			handlers := NewAuthHandlers(mockService, logger)
+
+			req := httptest.NewRequest("GET", "/api/v1/auth/me", http.NoBody)
+			rr := httptest.NewRecorder()
+
+			// Add user context to request (simulating auth middleware)
+			ctx := context.WithValue(req.Context(), UserIDKey, "test-user-id")
+			ctx = context.WithValue(ctx, UserEmailKey, "test@example.com")
+			req = req.WithContext(ctx)
+
+			handlers.Me(rr, req)
+
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			if tt.expectedError {
+				var response map[string]interface{}
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Contains(t, response, "error")
+			} else {
+				var response map[string]interface{}
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Contains(t, response, "user_id")
+				assert.Contains(t, response, "email")
+				assert.Contains(t, response, "message")
+				assert.Equal(t, "test-user-id", response["user_id"])
+				assert.Equal(t, "test@example.com", response["email"])
+			}
+
+			mockService.AssertExpectations(t)
+		})
+	}
 }

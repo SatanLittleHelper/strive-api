@@ -277,3 +277,37 @@ func (h *AuthHandlers) Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
 }
+
+// Me returns information about the current authenticated user
+// @Summary Get current user information
+// @Description Returns information about the currently authenticated user
+// @Tags authentication
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{} "User information"
+// @Failure 401 {object} AuthError "Unauthorized"
+// @Failure 500 {object} AuthError "Internal server error"
+// @Router /api/v1/auth/me [get]
+func (h *AuthHandlers) Me(w http.ResponseWriter, r *http.Request) {
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		h.logger.Error("User ID not found in context")
+		http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
+		return
+	}
+
+	userEmail, _ := GetUserEmailFromContext(r.Context())
+
+	response := map[string]interface{}{
+		"user_id": userID,
+		"email":   userEmail,
+		"message": "User authenticated successfully",
+	}
+
+	h.logger.Info("User profile requested", "user_id", userID, "email", userEmail)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
+}
