@@ -35,7 +35,7 @@ func getCookieSettings() (secure bool, sameSite http.SameSite) {
 	if isProduction {
 		return true, http.SameSiteLaxMode
 	}
-	return false, http.SameSiteNoneMode
+	return true, http.SameSiteNoneMode
 }
 
 func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {

@@ -165,11 +165,3 @@ func (h *DetailedHealthHandler) DetailedHealth(w http.ResponseWriter, r *http.Re
 	_ = json.NewEncoder(w).Encode(response)
 }
 
-func HealthHandler(w http.ResponseWriter, r *http.Request) {
-	response := map[string]string{
-		"status": "ok",
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(response)
-}

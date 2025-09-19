@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -49,7 +50,7 @@ func TestJWTSecretValidation(t *testing.T) {
 					t.Errorf("Expected error but got none")
 					return
 				}
-				if tt.errorMsg != "" && err.Error() != tt.errorMsg && !contains(err.Error(), tt.errorMsg) {
+				if tt.errorMsg != "" && err.Error() != tt.errorMsg && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("Expected error message to contain '%s', got '%s'", tt.errorMsg, err.Error())
 				}
 			} else {
@@ -84,7 +85,3 @@ func TestConfigValidation(t *testing.T) {
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr ||
-		len(s) > len(substr) && contains(s[1:], substr)
-}
