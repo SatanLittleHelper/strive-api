@@ -84,4 +84,3 @@ func TestConfigValidation(t *testing.T) {
 		t.Errorf("Config validation failed: %v", err)
 	}
 }
-

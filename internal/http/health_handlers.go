@@ -164,4 +164,3 @@ func (h *DetailedHealthHandler) DetailedHealth(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
 }
-

@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-
 func TestAuthHandlers_Register(t *testing.T) {
 	logger := logger.New("INFO", "json")
 
@@ -191,7 +190,6 @@ func TestAuthHandlers_Login(t *testing.T) {
 		})
 	}
 }
-
 
 func TestAuthHandlers_Me(t *testing.T) {
 	logger := logger.New("INFO", "json")

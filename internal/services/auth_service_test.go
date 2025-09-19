@@ -16,7 +16,6 @@ type mockUserRepository struct {
 	users map[string]*models.User
 }
 
-
 func (m *mockUserRepository) Create(ctx context.Context, user *models.User) error {
 	normalizedEmail := strings.ToLower(strings.TrimSpace(user.Email))
 	m.users[normalizedEmail] = user
@@ -57,9 +56,9 @@ func (m *mockUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func TestAuthService_Register(t *testing.T) {
-		mockRepo := &mockUserRepository{
-			users: make(map[string]*models.User),
-		}
+	mockRepo := &mockUserRepository{
+		users: make(map[string]*models.User),
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
 		Issuer:    "test-issuer",
@@ -92,9 +91,9 @@ func TestAuthService_Register(t *testing.T) {
 }
 
 func TestAuthService_Login(t *testing.T) {
-		mockRepo := &mockUserRepository{
-			users: make(map[string]*models.User),
-		}
+	mockRepo := &mockUserRepository{
+		users: make(map[string]*models.User),
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
 		Issuer:    "test-issuer",
@@ -129,9 +128,9 @@ func TestAuthService_Login(t *testing.T) {
 }
 
 func TestAuthService_LoginCaseInsensitive(t *testing.T) {
-		mockRepo := &mockUserRepository{
-			users: make(map[string]*models.User),
-		}
+	mockRepo := &mockUserRepository{
+		users: make(map[string]*models.User),
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
 		Issuer:    "test-issuer",
@@ -166,9 +165,9 @@ func TestAuthService_LoginCaseInsensitive(t *testing.T) {
 }
 
 func TestAuthService_HashPassword(t *testing.T) {
-		mockRepo := &mockUserRepository{
-			users: make(map[string]*models.User),
-		}
+	mockRepo := &mockUserRepository{
+		users: make(map[string]*models.User),
+	}
 	jwtConfig := &config.JWTConfig{
 		Secret:    "test-secret",
 		Issuer:    "test-issuer",

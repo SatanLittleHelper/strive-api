@@ -29,27 +29,25 @@ func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *A
 	}
 }
 
-func getCookieSettings() (secure bool, sameSite http.SameSite) {
+func getCookieSettings() bool {
 	isProduction := os.Getenv("ENVIRONMENT") == productionEnv
-
-	if isProduction {
-		return true, http.SameSiteLaxMode
-	}
-	return true, http.SameSiteNoneMode
+	return isProduction
 }
 
 func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
-	secure, sameSite := getCookieSettings()
+	secure := getCookieSettings()
 
-	http.SetCookie(w, &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     "/",
 		Secure:   secure,
 		HttpOnly: true,
-		SameSite: sameSite,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
-	})
+	}
+
+	http.SetCookie(w, cookie)
 }
 
 type RegisterRequest struct {
