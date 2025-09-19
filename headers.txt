@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Vary: Origin
+X-Request-Id: aead0c5a-d7e8-44e3-9804-43bc7314cf19
+Date: Fri, 19 Sep 2025 12:29:01 GMT
+Content-Length: 688
+

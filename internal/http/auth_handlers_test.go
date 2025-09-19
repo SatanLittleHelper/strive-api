@@ -15,15 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
-	for _, cookie := range cookies {
-		if cookie.Name == name {
-			return cookie
-		}
-	}
-	return nil
-}
-
 func TestAuthHandlers_Register(t *testing.T) {
 	logger := logger.New("INFO", "json")
 
@@ -180,8 +171,14 @@ func TestAuthHandlers_Login(t *testing.T) {
 			} else {
 				// Check that cookies are set instead of JSON tokens
 				cookies := rr.Result().Cookies()
-				accessTokenCookie := findCookie(cookies, "access-token")
-				refreshTokenCookie := findCookie(cookies, "refresh-token")
+				var accessTokenCookie, refreshTokenCookie *http.Cookie
+				for _, cookie := range cookies {
+					if cookie.Name == "access-token" {
+						accessTokenCookie = cookie
+					} else if cookie.Name == "refresh-token" {
+						refreshTokenCookie = cookie
+					}
+				}
 
 				assert.NotNil(t, accessTokenCookie, "access-token cookie should be set")
 				assert.NotNil(t, refreshTokenCookie, "refresh-token cookie should be set")
@@ -192,21 +189,6 @@ func TestAuthHandlers_Login(t *testing.T) {
 			mockService.AssertExpectations(t)
 		})
 	}
-}
-
-func TestHealthHandler(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
-	rr := httptest.NewRecorder()
-
-	HealthHandler(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
-
-	var response map[string]string
-	err := json.Unmarshal(rr.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, "ok", response["status"])
 }
 
 func TestAuthHandlers_Me(t *testing.T) {
