@@ -3,38 +3,36 @@ package http
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 
+	"github.com/aleksandr/strive-api/internal/config"
 	"github.com/aleksandr/strive-api/internal/logger"
 	"github.com/aleksandr/strive-api/internal/models"
 	"github.com/aleksandr/strive-api/internal/services"
 	"github.com/aleksandr/strive-api/internal/validation"
 )
 
-const (
-	productionEnv = "production"
-)
-
 type AuthHandlers struct {
 	authService    services.AuthService
 	logger         *logger.Logger
 	securityLogger *SecurityLogger
+	config         *config.Config
 }
 
-func NewAuthHandlers(authService services.AuthService, logger *logger.Logger) *AuthHandlers {
+func NewAuthHandlers(authService services.AuthService, logger *logger.Logger, cfg *config.Config) *AuthHandlers {
 	return &AuthHandlers{
 		authService:    authService,
 		logger:         logger,
 		securityLogger: NewSecurityLogger(logger),
+		config:         cfg,
 	}
 }
 
-func getCookieSettings() bool {
-	return os.Getenv("ENVIRONMENT") == productionEnv
+func (h *AuthHandlers) getCookieSettings() (secure bool, sameSite http.SameSite) {
+	return false, http.SameSiteNoneMode
 }
 
-func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
-	secure := getCookieSettings()
+func (h *AuthHandlers) setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
+	secure, sameSite := h.getCookieSettings()
 
 	cookie := &http.Cookie{
 		Name:     name,
@@ -42,7 +40,7 @@ func setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {
 		Path:     "/",
 		Secure:   secure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: sameSite,
 		MaxAge:   maxAge,
 	}
 
@@ -64,11 +62,10 @@ type RefreshRequest struct {
 }
 
 type AuthResponse struct {
-	AccessToken  string `json:"access_token,omitempty" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	RefreshToken string `json:"refresh_token,omitempty" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	ExpiresIn    int    `json:"expires_in" example:"900"`
-	TokenType    string `json:"token_type" example:"Bearer"`
-	Message      string `json:"message,omitempty" example:"Login successful"`
+	AccessToken string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	ExpiresIn   int    `json:"expires_in" example:"900"`
+	TokenType   string `json:"token_type" example:"Bearer"`
+	Message     string `json:"message,omitempty" example:"Login successful"`
 }
 
 type ErrorResponse struct {
@@ -204,13 +201,13 @@ func (h *AuthHandlers) Login(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("User logged in successfully", "email", req.Email)
 
-	setSecureCookie(w, "access-token", accessToken, 900)
-	setSecureCookie(w, "refresh-token", refreshToken, 604800)
+	h.setSecureCookie(w, "refresh-token", refreshToken, 604800)
 
 	response := AuthResponse{
-		ExpiresIn: 900,
-		TokenType: "Bearer",
-		Message:   "Login successful",
+		AccessToken: accessToken,
+		ExpiresIn:   900,
+		TokenType:   "Bearer",
+		Message:     "Login successful",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -254,13 +251,13 @@ func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("Token refreshed successfully")
 
-	setSecureCookie(w, "access-token", accessToken, 900)
-	setSecureCookie(w, "refresh-token", refreshToken, 604800)
+	h.setSecureCookie(w, "refresh-token", refreshToken, 604800)
 
 	response := AuthResponse{
-		ExpiresIn: 900,
-		TokenType: "Bearer",
-		Message:   "Token refreshed successfully",
+		AccessToken: accessToken,
+		ExpiresIn:   900,
+		TokenType:   "Bearer",
+		Message:     "Token refreshed successfully",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -277,8 +274,14 @@ func (h *AuthHandlers) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]interface{} "Logout successful"
 // @Router /api/v1/auth/logout [post]
 func (h *AuthHandlers) Logout(w http.ResponseWriter, r *http.Request) {
-	setSecureCookie(w, "access-token", "", -1)
-	setSecureCookie(w, "refresh-token", "", -1)
+	refreshTokenCookie, err := r.Cookie("refresh-token")
+	if err == nil && refreshTokenCookie.Value != "" {
+		if err := h.authService.Logout(r.Context(), refreshTokenCookie.Value); err != nil {
+			h.logger.Error("Failed to logout user", "error", err)
+		}
+	}
+
+	h.setSecureCookie(w, "refresh-token", "", -1)
 
 	h.logger.Info("User logged out successfully")
 

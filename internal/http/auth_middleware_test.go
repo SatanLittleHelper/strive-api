@@ -46,6 +46,10 @@ func (m *mockAuthService) VerifyPassword(hashedPassword, password string) error 
 	return nil
 }
 
+func (m *mockAuthService) Logout(ctx context.Context, refreshToken string) error {
+	return nil
+}
+
 func TestAuthMiddleware(t *testing.T) {
 	log := logger.New("INFO", "json")
 

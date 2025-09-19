@@ -47,3 +47,8 @@ func (m *MockAuthService) RefreshToken(ctx context.Context, refreshToken string)
 	args := m.Called(ctx, refreshToken)
 	return args.String(0), args.String(1), args.Error(2)
 }
+
+func (m *MockAuthService) Logout(ctx context.Context, refreshToken string) error {
+	args := m.Called(ctx, refreshToken)
+	return args.Error(0)
+}

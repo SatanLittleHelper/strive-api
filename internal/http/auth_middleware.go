@@ -56,33 +56,19 @@ func logAuthFailure(log *logger.Logger, r *http.Request, reason string) {
 func AuthMiddleware(authService services.AuthService, log *logger.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var tokenString string
-			var authSource string
-
-			// Try to get token from Authorization header first
 			authHeader := r.Header.Get("Authorization")
-			if authHeader != "" {
-				parts := strings.SplitN(authHeader, " ", 2)
-				if len(parts) == 2 && parts[0] == "Bearer" && parts[1] != "" {
-					tokenString = parts[1]
-					authSource = "header"
-				}
-			}
-
-			// If no token in header, try to get from cookie
-			if tokenString == "" {
-				accessTokenCookie, err := r.Cookie("access-token")
-				if err == nil && accessTokenCookie.Value != "" {
-					tokenString = accessTokenCookie.Value
-					authSource = "cookie"
-				}
-			}
-
-			// If still no token, return error
-			if tokenString == "" {
-				writeAuthError(w, log, r, "UNAUTHORIZED", "Authentication required", "missing_token")
+			if authHeader == "" {
+				writeAuthError(w, log, r, "UNAUTHORIZED", "Authentication required", "missing_authorization_header")
 				return
 			}
+
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" || parts[1] == "" {
+				writeAuthError(w, log, r, "UNAUTHORIZED", "Invalid authorization header format", "invalid_authorization_format")
+				return
+			}
+
+			tokenString := parts[1]
 
 			claims, err := authService.ValidateToken(tokenString)
 			if err != nil {
@@ -107,11 +93,9 @@ func AuthMiddleware(authService services.AuthService, log *logger.Logger) func(h
 				return
 			}
 
-			// Log successful authentication with source
 			log.Debug("Authentication successful",
 				"user_id", claims.UserID,
-				"email", claims.Email,
-				"source", authSource)
+				"email", claims.Email)
 
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID.String())
 			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
