@@ -45,6 +45,16 @@ func (m *mockUserRepository) Update(ctx context.Context, user *models.User) erro
 	return nil
 }
 
+func (m *mockUserRepository) UpdateTheme(ctx context.Context, userID uuid.UUID, theme string) error {
+	for _, user := range m.users {
+		if user.ID == userID {
+			user.Theme = theme
+			return nil
+		}
+	}
+	return fmt.Errorf("user not found")
+}
+
 func (m *mockUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	for email, user := range m.users {
 		if user.ID == id {
@@ -137,6 +147,10 @@ func TestAuthService_Register(t *testing.T) {
 
 	if user.PasswordHash == req.Password {
 		t.Error("Password should be hashed")
+	}
+
+	if user.Theme != "light" {
+		t.Errorf("Expected theme 'light', got %s", user.Theme)
 	}
 
 	if user.ID == uuid.Nil {
