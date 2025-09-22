@@ -42,6 +42,16 @@ func (s *Server) Start() {
 	}()
 }
 
+func (s *Server) StartTLS(certFile, keyFile string) {
+	s.logger.Info("Starting HTTPS server", "addr", s.httpServer.Addr)
+	go func() {
+		if err := s.httpServer.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+			s.logger.Error("HTTPS server error", "error", err)
+			log.Fatalf("HTTPS server error: %v", err)
+		}
+	}()
+}
+
 func (s *Server) Stop(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }

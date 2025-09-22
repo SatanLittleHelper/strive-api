@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	_ "github.com/aleksandr/strive-api/docs"
 	"github.com/aleksandr/strive-api/internal/config"
@@ -53,8 +54,22 @@ func main() {
 
 	// Start server
 	server := httphandler.NewServer(cfg, handler, logger)
-	server.Start()
+
+	// Check if SSL certificates exist for HTTPS (only for localhost development)
+	if fileExists("certs/localhost-cert.pem") && fileExists("certs/localhost-key.pem") {
+		server.StartTLS("certs/localhost-cert.pem", "certs/localhost-key.pem")
+		logger.Info("Starting with HTTPS (localhost development certificates found)")
+	} else {
+		server.Start()
+		logger.Info("Starting with HTTP (production mode - SSL handled by platform)")
+	}
+
 	server.WaitForShutdown()
+}
+
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	return !os.IsNotExist(err)
 }
 
 func loadConfig() *config.Config {

@@ -144,8 +144,8 @@ func Load() (*Config, error) {
 			XSSProtection:       getEnv("SECURITY_XSS_PROTECTION", "1; mode=block"),
 		},
 		Cookie: CookieConfig{
-			Secure:   false,
-			SameSite: http.SameSiteNoneMode,
+			Secure:   getEnv("COOKIE_SECURE", "true") == trueStr,
+			SameSite: parseSameSite(getEnv("COOKIE_SAMESITE", "Strict")),
 		},
 	}
 
@@ -237,4 +237,17 @@ func getEnvSlice(key string, defaultValue []string) []string {
 		return strings.Split(value, ",")
 	}
 	return defaultValue
+}
+
+func parseSameSite(value string) http.SameSite {
+	switch value {
+	case "None":
+		return http.SameSiteNoneMode
+	case "Strict":
+		return http.SameSiteStrictMode
+	case "Lax":
+		return http.SameSiteLaxMode
+	default:
+		return http.SameSiteStrictMode
+	}
 }
