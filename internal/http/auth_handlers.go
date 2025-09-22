@@ -28,7 +28,7 @@ func NewAuthHandlers(authService services.AuthService, logger *logger.Logger, cf
 }
 
 func (h *AuthHandlers) getCookieSettings() (secure bool, sameSite http.SameSite) {
-	return false, http.SameSiteDefaultMode
+	return h.config.Cookie.Secure, h.config.Cookie.SameSite
 }
 
 func (h *AuthHandlers) setSecureCookie(w http.ResponseWriter, name, value string, maxAge int) {

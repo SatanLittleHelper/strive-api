@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type Config struct {
 	RateLimit       RateLimitConfig
 	CORS            CORSConfig
 	SecurityHeaders SecurityHeadersConfig
+	Cookie          CookieConfig
 }
 
 type ServerConfig struct {
@@ -76,6 +78,11 @@ type SecurityHeadersConfig struct {
 	XContentTypeOptions   string
 	ReferrerPolicy        string
 	XSSProtection         string
+}
+
+type CookieConfig struct {
+	Secure   bool
+	SameSite http.SameSite
 }
 
 func Load() (*Config, error) {
@@ -135,6 +142,10 @@ func Load() (*Config, error) {
 			XContentTypeOptions: getEnv("SECURITY_X_CONTENT_TYPE_OPTIONS", "nosniff"),
 			ReferrerPolicy:      getEnv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"),
 			XSSProtection:       getEnv("SECURITY_XSS_PROTECTION", "1; mode=block"),
+		},
+		Cookie: CookieConfig{
+			Secure:   false,
+			SameSite: http.SameSiteNoneMode,
 		},
 	}
 
