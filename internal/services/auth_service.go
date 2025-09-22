@@ -83,6 +83,7 @@ func (s *authService) Register(ctx context.Context, req *models.CreateUserReques
 		ID:           uuid.New(),
 		Email:        normalizedEmail,
 		PasswordHash: hashedPassword,
+		Theme:        "light",
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}

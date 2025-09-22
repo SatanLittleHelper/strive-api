@@ -46,11 +46,11 @@ func main() {
 	runMigrations(cfg, logger)
 
 	// Initialize services and handlers
-	authService := setupServices(db, cfg)
-	handlers := setupHandlers(authService, logger, db, cfg)
+	services := setupServices(db, cfg)
+	handlers := setupHandlers(services, logger, db, cfg)
 
 	// Setup routes and middleware
-	handler := setupRoutes(handlers, logger, authService, cfg)
+	handler := setupRoutes(handlers, logger, services.Auth, cfg)
 
 	// Start server
 	server := httphandler.NewServer(cfg, handler, logger)
@@ -100,21 +100,32 @@ func runMigrations(cfg *config.Config, logger *logger.Logger) {
 	}
 }
 
-func setupServices(db *database.Database, cfg *config.Config) services.AuthService {
+type Services struct {
+	Auth services.AuthService
+	User services.UserService
+}
+
+func setupServices(db *database.Database, cfg *config.Config) *Services {
 	userRepo := repositories.NewUserRepository(db.Pool())
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(db.Pool())
 	authService := services.NewAuthService(userRepo, refreshTokenRepo, &cfg.JWT)
-	return authService
+	userService := services.NewUserService(userRepo)
+	return &Services{
+		Auth: authService,
+		User: userService,
+	}
 }
 
 type Handlers struct {
 	Auth   *httphandler.AuthHandlers
+	User   *httphandler.UserHandlers
 	Health *httphandler.DetailedHealthHandler
 }
 
-func setupHandlers(authService services.AuthService, logger *logger.Logger, db *database.Database, cfg *config.Config) *Handlers {
+func setupHandlers(services *Services, logger *logger.Logger, db *database.Database, cfg *config.Config) *Handlers {
 	return &Handlers{
-		Auth:   httphandler.NewAuthHandlers(authService, logger, cfg),
+		Auth:   httphandler.NewAuthHandlers(services.Auth, logger, cfg),
+		User:   httphandler.NewUserHandlers(services.User, logger),
 		Health: httphandler.NewDetailedHealthHandler(logger, db.Pool()),
 	}
 }
@@ -149,13 +160,12 @@ func setupPublicRoutes(mux *http.ServeMux, handlers *Handlers) {
 }
 
 func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, logger *logger.Logger, handlers *Handlers) {
-	protectedMux := http.NewServeMux()
-
-	protectedMux.HandleFunc("/me", handlers.Auth.Me)
-
-	protectedHandler := httphandler.AuthMiddleware(authService, logger)(protectedMux)
-
-	mux.Handle("/api/v1/auth/", http.StripPrefix("/api/v1/auth", protectedHandler))
+	// User protected routes
+	userProtectedMux := http.NewServeMux()
+	userProtectedMux.HandleFunc("/me", handlers.User.Me)
+	userProtectedMux.HandleFunc("/theme", handlers.User.UpdateTheme)
+	userProtectedHandler := httphandler.AuthMiddleware(authService, logger)(userProtectedMux)
+	mux.Handle("/api/v1/user/", http.StripPrefix("/api/v1/user", userProtectedHandler))
 }
 
 func applyMiddleware(mux *http.ServeMux, logger *logger.Logger, cfg *config.Config) http.Handler {

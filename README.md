@@ -5,9 +5,12 @@ A modern workout diary API built with Go, featuring user authentication, JWT tok
 ## 🚀 Features
 
 - **User Authentication**: JWT-based authentication with access and refresh tokens
-- **Password Security**: bcrypt password hashing
+- **User Profile Management**: Complete user profile with theme preferences
+- **Theme Support**: Light/Dark theme selection for users
+- **Password Security**: bcrypt password hashing with strong validation
 - **Database Integration**: PostgreSQL with automatic migrations
-- **Comprehensive Testing**: 17 unit tests with 73%+ code coverage
+- **Clean Architecture**: Separation of concerns with services and repositories
+- **Comprehensive Testing**: Unit tests with race detection
 - **API Documentation**: OpenAPI/Swagger documentation
 - **Containerization**: Docker and Docker Compose support
 - **Structured Logging**: JSON/text logging with configurable levels
@@ -91,10 +94,13 @@ Once the server is running, visit:
 - `GET /health` - Health check
 - `POST /api/v1/auth/register` - User registration
 - `POST /api/v1/auth/login` - User login
+- `POST /api/v1/auth/refresh` - Refresh access token
+- `POST /api/v1/auth/logout` - User logout
 
 ### Protected Endpoints (require JWT token)
 
-- `GET /api/v1/user/profile` - Get user profile
+- `GET /api/v1/user/me` - Get user profile (includes theme)
+- `PUT /api/v1/user/theme` - Update user theme preference
 
 ### Example Usage
 
@@ -118,10 +124,18 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   }'
 ```
 
-**Access protected endpoint:**
+**Get user profile:**
 ```bash
-curl -X GET http://localhost:8080/api/v1/user/profile \
+curl -X GET http://localhost:8080/api/v1/user/me \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Update user theme:**
+```bash
+curl -X PUT http://localhost:8080/api/v1/user/theme \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"theme":"dark"}'
 ```
 
 ## 🧪 Testing
@@ -194,11 +208,19 @@ strive-api/
 │   ├── config/          # Configuration management
 │   ├── database/        # Database connection and health
 │   ├── http/           # HTTP handlers and middleware
+│   │   ├── auth_handlers.go    # Authentication endpoints
+│   │   ├── user_handlers.go    # User profile and theme endpoints
+│   │   ├── middleware.go       # Security and logging middleware
+│   │   └── ...
 │   ├── logger/         # Structured logging
 │   ├── migrate/        # Database migrations
-│   ├── models/         # Data models
+│   ├── models/         # Data models (User, Theme, etc.)
 │   ├── repositories/   # Data access layer
-│   └── services/       # Business logic
+│   ├── services/       # Business logic
+│   │   ├── auth_service.go     # Authentication logic
+│   │   ├── user_service.go     # User profile and theme logic
+│   │   └── ...
+│   └── validation/     # Input validation
 ├── docs/               # Generated API documentation
 ├── migrations/         # Database migration files
 ├── docker-compose.yml  # Docker Compose configuration

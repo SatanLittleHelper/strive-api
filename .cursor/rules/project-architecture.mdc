@@ -100,6 +100,7 @@ strive-api/
 
 #### Handlers
 - **AuthHandlers**: Регистрация, авторизация, обновление токенов
+- **UserHandlers**: Управление профилем пользователя и темами
 - **HealthHandlers**: Проверка состояния приложения и БД
 
 #### Middleware
@@ -122,6 +123,7 @@ type User struct {
     ID           uuid.UUID `json:"id" db:"id"`
     Email        string    `json:"email" db:"email"`
     PasswordHash string    `json:"-" db:"password_hash"`
+    Theme        string    `json:"theme" db:"theme"`
     CreatedAt    time.Time `json:"created_at" db:"created_at"`
     UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -131,10 +133,11 @@ type User struct {
 - CreateUserRequest
 - UpdateUserRequest
 - ChangePasswordRequest
+- UpdateUserThemeRequest
 
 ### 5. Сервисы (internal/services/)
 
-**Файл**: `auth_service.go`
+#### AuthService (`auth_service.go`)
 
 Бизнес-логика аутентификации:
 
@@ -155,6 +158,24 @@ type AuthService interface {
 - JWT токены (access + refresh) с расширенной валидацией
 - Валидация токенов с проверкой iss/aud/clock skew
 - Специфичные ошибки валидации (ErrTokenExpired, ErrInvalidIssuer, etc.)
+- Инициализация темы пользователя по умолчанию при регистрации
+
+#### UserService (`user_service.go`)
+
+Бизнес-логика управления профилем пользователя:
+
+```go
+type UserService interface {
+    GetUserProfile(ctx context.Context, userID uuid.UUID) (*models.User, error)
+    UpdateUserTheme(ctx context.Context, userID uuid.UUID, theme string) error
+}
+```
+
+**Функциональность**:
+- Получение профиля пользователя с темой
+- Обновление темы пользователя (light/dark)
+- Валидация темы на уровне сервиса
+- Разделение ответственности от AuthService
 
 ### 6. Репозитории (internal/repositories/)
 
@@ -168,6 +189,7 @@ type UserRepository interface {
     GetByID(ctx context.Context, id uuid.UUID) (*models.User, error)
     GetByEmail(ctx context.Context, email string) (*models.User, error)
     Update(ctx context.Context, user *models.User) error
+    UpdateTheme(ctx context.Context, userID uuid.UUID, theme string) error
     Delete(ctx context.Context, id uuid.UUID) error
 }
 ```
@@ -176,6 +198,8 @@ type UserRepository interface {
 - Подготовленные SQL запросы
 - Context для отмены операций
 - Обработка ошибок БД
+- Операции с темами пользователей
+- Рефакторинг с общими методами сканирования
 
 ### 7. Валидация (internal/validation/)
 
@@ -184,6 +208,7 @@ type UserRepository interface {
 Валидация входных данных:
 - Email валидация
 - Пароль валидация (минимум 8 символов, специальные символы, заглавные/строчные буквы, цифры)
+- Валидация темы (только 'light' или 'dark')
 - Структурированные ошибки валидации
 
 ### 8. Логирование (internal/logger/)
@@ -223,7 +248,8 @@ GET  /swagger/                  - Swagger документация
 ### Защищенные эндпоинты:
 
 ```
-GET  /api/v1/auth/me           - Информация о текущем пользователе
+GET  /api/v1/user/me           - Информация о текущем пользователе (включая тему)
+PUT  /api/v1/user/theme        - Обновление темы пользователя
 ```
 
 ## Конфигурация через ENV
