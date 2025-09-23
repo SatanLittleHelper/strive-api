@@ -7,7 +7,6 @@ import (
 	"github.com/aleksandr/strive-api/internal/logger"
 	"github.com/aleksandr/strive-api/internal/services"
 	"github.com/aleksandr/strive-api/internal/validation"
-	"github.com/google/uuid"
 )
 
 type UserHandlers struct {
@@ -40,28 +39,21 @@ type UpdateUserThemeRequest struct {
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /api/v1/user/me [get]
 func (h *UserHandlers) Me(w http.ResponseWriter, r *http.Request) {
-	userID, ok := GetUserIDFromContext(r.Context())
-	if !ok {
-		h.logger.Error("User ID not found in context")
-		http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID)
+	userUUID, err := GetUserIDFromContext(r.Context())
 	if err != nil {
-		h.logger.Error("Invalid user ID format", "error", err, "user_id", userID)
-		http.Error(w, `{"error":{"code":"INVALID_USER_ID","message":"Invalid user ID format"}}`, http.StatusInternalServerError)
+		h.logger.Error("User ID not found in context", "error", err)
+		http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
 		return
 	}
 
 	user, err := h.userService.GetUserProfile(r.Context(), userUUID)
 	if err != nil {
-		h.logger.Error("Failed to get user profile", "error", err, "user_id", userID)
+		h.logger.Error("Failed to get user profile", "error", err, "user_id", userUUID)
 		http.Error(w, `{"error":{"code":"USER_NOT_FOUND","message":"User not found"}}`, http.StatusNotFound)
 		return
 	}
 
-	h.logger.Info("User profile requested", "user_id", userID, "email", user.Email, "theme", user.Theme)
+	h.logger.Info("User profile requested", "user_id", userUUID, "email", user.Email, "theme", user.Theme)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -82,9 +74,9 @@ func (h *UserHandlers) Me(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /api/v1/user/theme [put]
 func (h *UserHandlers) UpdateTheme(w http.ResponseWriter, r *http.Request) {
-	userID, ok := GetUserIDFromContext(r.Context())
-	if !ok {
-		h.logger.Error("User ID not found in context")
+	userUUID, err := GetUserIDFromContext(r.Context())
+	if err != nil {
+		h.logger.Error("User ID not found in context", "error", err)
 		http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
 		return
 	}
@@ -117,15 +109,8 @@ func (h *UserHandlers) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userUUID, err := uuid.Parse(userID)
-	if err != nil {
-		h.logger.Error("Invalid user ID format", "error", err, "user_id", userID)
-		http.Error(w, `{"error":{"code":"INVALID_USER_ID","message":"Invalid user ID format"}}`, http.StatusInternalServerError)
-		return
-	}
-
 	if err := h.userService.UpdateUserTheme(r.Context(), userUUID, req.Theme); err != nil {
-		h.logger.Error("Failed to update user theme", "error", err, "user_id", userID, "theme", req.Theme)
+		h.logger.Error("Failed to update user theme", "error", err, "user_id", userUUID, "theme", req.Theme)
 		if err == services.ErrInvalidTheme {
 			http.Error(w, `{"error":{"code":"INVALID_THEME","message":"Invalid theme value"}}`, http.StatusBadRequest)
 		} else {
@@ -134,7 +119,7 @@ func (h *UserHandlers) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("User theme updated successfully", "user_id", userID, "theme", req.Theme)
+	h.logger.Info("User theme updated successfully", "user_id", userUUID, "theme", req.Theme)
 
 	response := map[string]interface{}{
 		"message": "Theme updated successfully",

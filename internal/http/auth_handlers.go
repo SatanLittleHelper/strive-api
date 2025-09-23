@@ -306,9 +306,9 @@ func (h *AuthHandlers) Logout(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} AuthError "Internal server error"
 // @Router /api/v1/auth/me [get]
 func (h *AuthHandlers) Me(w http.ResponseWriter, r *http.Request) {
-	userID, ok := GetUserIDFromContext(r.Context())
-	if !ok {
-		h.logger.Error("User ID not found in context")
+	userID, err := GetUserIDFromContext(r.Context())
+	if err != nil {
+		h.logger.Error("User ID not found in context", "error", err)
 		http.Error(w, `{"error":{"code":"INTERNAL_ERROR","message":"User ID not found in context"}}`, http.StatusInternalServerError)
 		return
 	}

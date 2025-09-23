@@ -11,13 +11,6 @@ import (
 	"github.com/aleksandr/strive-api/internal/services"
 )
 
-type contextKey string
-
-const (
-	UserIDKey    contextKey = "user_id"
-	UserEmailKey contextKey = "user_email"
-)
-
 type AuthError struct {
 	Error struct {
 		Code    string `json:"code"`
@@ -103,14 +96,4 @@ func AuthMiddleware(authService services.AuthService, log *logger.Logger) func(h
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-}
-
-func GetUserIDFromContext(ctx context.Context) (string, bool) {
-	userID, ok := ctx.Value(UserIDKey).(string)
-	return userID, ok
-}
-
-func GetUserEmailFromContext(ctx context.Context) (string, bool) {
-	email, ok := ctx.Value(UserEmailKey).(string)
-	return email, ok
 }

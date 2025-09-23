@@ -227,7 +227,7 @@ func TestAuthHandlers_Me(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			// Add user context to request (simulating auth middleware)
-			ctx := context.WithValue(req.Context(), UserIDKey, "test-user-id")
+			ctx := context.WithValue(req.Context(), UserIDKey, "5891f008-f598-4aad-86bd-cae765c22fed")
 			ctx = context.WithValue(ctx, UserEmailKey, "test@example.com")
 			req = req.WithContext(ctx)
 
@@ -247,7 +247,7 @@ func TestAuthHandlers_Me(t *testing.T) {
 				assert.Contains(t, response, "user_id")
 				assert.Contains(t, response, "email")
 				assert.Contains(t, response, "message")
-				assert.Equal(t, "test-user-id", response["user_id"])
+				assert.Equal(t, "5891f008-f598-4aad-86bd-cae765c22fed", response["user_id"])
 				assert.Equal(t, "test@example.com", response["email"])
 			}
 
