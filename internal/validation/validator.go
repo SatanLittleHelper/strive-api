@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+
+	"github.com/aleksandr/strive-api/internal/models"
 )
 
 type ValidationError struct {
@@ -13,6 +15,38 @@ type ValidationError struct {
 }
 
 type ValidationErrors []ValidationError
+
+type Validator struct{}
+
+func (v *Validator) Validate(data interface{}) error {
+	var errors ValidationErrors
+
+	if d, ok := data.(models.CalorieCalculationData); ok {
+		if err := ValidateGender(d.Gender); err != nil {
+			errors = append(errors, ValidationError{Field: "gender", Message: err.Error()})
+		}
+		if err := ValidateAge(d.Age); err != nil {
+			errors = append(errors, ValidationError{Field: "age", Message: err.Error()})
+		}
+		if err := ValidateHeight(d.Height); err != nil {
+			errors = append(errors, ValidationError{Field: "height", Message: err.Error()})
+		}
+		if err := ValidateWeight(d.Weight); err != nil {
+			errors = append(errors, ValidationError{Field: "weight", Message: err.Error()})
+		}
+		if err := ValidateActivityLevel(d.ActivityLevel); err != nil {
+			errors = append(errors, ValidationError{Field: "activityLevel", Message: err.Error()})
+		}
+		if err := ValidateGoal(d.Goal); err != nil {
+			errors = append(errors, ValidationError{Field: "goal", Message: err.Error()})
+		}
+	}
+
+	if len(errors) > 0 {
+		return errors
+	}
+	return nil
+}
 
 func (ve ValidationErrors) Error() string {
 	var messages []string
@@ -105,4 +139,64 @@ func ValidateString(value, fieldName string, minLen, maxLen int) error {
 		return fmt.Errorf("%s too long (max %d characters)", fieldName, maxLen)
 	}
 	return nil
+}
+
+func ValidateGender(gender string) error {
+	if gender == "" {
+		return fmt.Errorf("gender is required")
+	}
+	for _, validGender := range models.Genders() {
+		if gender == validGender {
+			return nil
+		}
+	}
+	return fmt.Errorf("gender must be 'male' or 'female'")
+}
+
+func ValidateAge(age int) error {
+	if age < 15 {
+		return fmt.Errorf("age must be at least 15 years")
+	}
+	if age > 120 {
+		return fmt.Errorf("age must be at most 120 years")
+	}
+	return nil
+}
+
+func ValidateHeight(height float64) error {
+	if height < 100 {
+		return fmt.Errorf("height must be at least 100 cm")
+	}
+	if height > 250 {
+		return fmt.Errorf("height must be at most 250 cm")
+	}
+	return nil
+}
+
+func ValidateWeight(weight float64) error {
+	if weight < 30 {
+		return fmt.Errorf("weight must be at least 30 kg")
+	}
+	if weight > 300 {
+		return fmt.Errorf("weight must be at most 300 kg")
+	}
+	return nil
+}
+
+func ValidateActivityLevel(activityLevel string) error {
+	for _, level := range models.ActivityLevels() {
+		if activityLevel == level {
+			return nil
+		}
+	}
+	return fmt.Errorf("activity level must be one of: sedentary, lightly_active, moderately_active, very_active, extremely_active")
+}
+
+func ValidateGoal(goal string) error {
+	for _, validGoal := range models.Goals() {
+		if goal == validGoal {
+			return nil
+		}
+	}
+	return fmt.Errorf("goal must be one of: lose_weight, maintain_weight, gain_weight")
 }

@@ -101,32 +101,40 @@ func runMigrations(cfg *config.Config, logger *logger.Logger) {
 }
 
 type Services struct {
-	Auth services.AuthService
-	User services.UserService
+	Auth    services.AuthService
+	User    services.UserService
+	Calorie services.CalorieService
 }
 
 func setupServices(db *database.Database, cfg *config.Config) *Services {
 	userRepo := repositories.NewUserRepository(db.Pool())
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(db.Pool())
+	calorieRepo := repositories.NewCalorieRepository(db.Pool())
+
 	authService := services.NewAuthService(userRepo, refreshTokenRepo, &cfg.JWT)
 	userService := services.NewUserService(userRepo)
+	calorieService := services.NewCalorieService(calorieRepo)
+
 	return &Services{
-		Auth: authService,
-		User: userService,
+		Auth:    authService,
+		User:    userService,
+		Calorie: calorieService,
 	}
 }
 
 type Handlers struct {
-	Auth   *httphandler.AuthHandlers
-	User   *httphandler.UserHandlers
-	Health *httphandler.DetailedHealthHandler
+	Auth    *httphandler.AuthHandlers
+	User    *httphandler.UserHandlers
+	Calorie *httphandler.CalorieHandlers
+	Health  *httphandler.DetailedHealthHandler
 }
 
 func setupHandlers(services *Services, logger *logger.Logger, db *database.Database, cfg *config.Config) *Handlers {
 	return &Handlers{
-		Auth:   httphandler.NewAuthHandlers(services.Auth, logger, cfg),
-		User:   httphandler.NewUserHandlers(services.User, logger),
-		Health: httphandler.NewDetailedHealthHandler(logger, db.Pool()),
+		Auth:    httphandler.NewAuthHandlers(services.Auth, logger, cfg),
+		User:    httphandler.NewUserHandlers(services.User, logger),
+		Calorie: httphandler.NewCalorieHandlers(services.Calorie, logger),
+		Health:  httphandler.NewDetailedHealthHandler(logger, db.Pool()),
 	}
 }
 
@@ -166,6 +174,13 @@ func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, 
 	userProtectedMux.HandleFunc("/theme", handlers.User.UpdateTheme)
 	userProtectedHandler := httphandler.AuthMiddleware(authService, logger)(userProtectedMux)
 	mux.Handle("/api/v1/user/", http.StripPrefix("/api/v1/user", userProtectedHandler))
+
+	// Calorie calculator protected routes
+	calorieProtectedMux := http.NewServeMux()
+	calorieProtectedMux.HandleFunc("/calculate", handlers.Calorie.CalculateCalories)
+	calorieProtectedMux.HandleFunc("/last", handlers.Calorie.GetLastCalculation)
+	calorieProtectedHandler := httphandler.AuthMiddleware(authService, logger)(calorieProtectedMux)
+	mux.Handle("/api/v1/calorie/", http.StripPrefix("/api/v1/calorie", calorieProtectedHandler))
 }
 
 func applyMiddleware(mux *http.ServeMux, logger *logger.Logger, cfg *config.Config) http.Handler {

@@ -214,12 +214,12 @@ func TestAuthMiddleware(t *testing.T) {
 		middleware := AuthMiddleware(mockAuth, log)
 
 		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contextUserID, ok := GetUserIDFromContext(r.Context())
-			assert.True(t, ok)
-			assert.Equal(t, userID.String(), contextUserID)
+			contextUserID, err := GetUserIDFromContext(r.Context())
+			assert.NoError(t, err)
+			assert.Equal(t, userID, contextUserID)
 
-			contextEmail, ok := GetUserEmailFromContext(r.Context())
-			assert.True(t, ok)
+			contextEmail, err := GetUserEmailFromContext(r.Context())
+			assert.NoError(t, err)
 			assert.Equal(t, email, contextEmail)
 
 			w.WriteHeader(http.StatusOK)
@@ -251,12 +251,12 @@ func TestAuthMiddleware(t *testing.T) {
 		middleware := AuthMiddleware(mockAuth, log)
 
 		handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			contextUserID, ok := GetUserIDFromContext(r.Context())
-			assert.True(t, ok)
-			assert.Equal(t, testUser.ID.String(), contextUserID)
+			contextUserID, err := GetUserIDFromContext(r.Context())
+			assert.NoError(t, err)
+			assert.Equal(t, testUser.ID, contextUserID)
 
-			contextEmail, ok := GetUserEmailFromContext(r.Context())
-			assert.True(t, ok)
+			contextEmail, err := GetUserEmailFromContext(r.Context())
+			assert.NoError(t, err)
 			assert.Equal(t, testUser.Email, contextEmail)
 
 			w.WriteHeader(http.StatusOK)
