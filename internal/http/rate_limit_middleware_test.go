@@ -14,6 +14,7 @@ const testClientIP = "192.168.1.1:12345"
 func TestRateLimiter_GeneralRequests(t *testing.T) {
 	cfg := &config.RateLimitConfig{
 		AuthRequestsPerMinute:    5,
+		RefreshRequestsPerMinute: 20,
 		GeneralRequestsPerMinute: 3,
 		BurstSize:                5,
 		Enabled:                  true,
@@ -51,6 +52,7 @@ func TestRateLimiter_GeneralRequests(t *testing.T) {
 func TestRateLimiter_AuthRequests(t *testing.T) {
 	cfg := &config.RateLimitConfig{
 		AuthRequestsPerMinute:    2,
+		RefreshRequestsPerMinute: 20,
 		GeneralRequestsPerMinute: 10,
 		BurstSize:                5,
 		Enabled:                  true,
@@ -85,9 +87,48 @@ func TestRateLimiter_AuthRequests(t *testing.T) {
 	}
 }
 
+func TestRateLimiter_RefreshRequests(t *testing.T) {
+	cfg := &config.RateLimitConfig{
+		AuthRequestsPerMinute:    2,
+		RefreshRequestsPerMinute: 5,
+		GeneralRequestsPerMinute: 10,
+		BurstSize:                5,
+		Enabled:                  true,
+	}
+
+	log := logger.New("INFO", "text")
+	rateLimiter := NewRateLimiter(cfg, log)
+
+	handler := rateLimiter.RateLimitMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+	}))
+
+	// Test refresh endpoint
+	req := httptest.NewRequest("POST", "/api/v1/auth/refresh", http.NoBody)
+	req.RemoteAddr = testClientIP
+
+	// First 5 requests should succeed
+	for i := 0; i < 5; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Errorf("Request %d: expected status 200, got %d", i+1, w.Code)
+		}
+	}
+
+	// 6th request should be rate limited
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("Expected status 429, got %d", w.Code)
+	}
+}
+
 func TestRateLimiter_Disabled(t *testing.T) {
 	cfg := &config.RateLimitConfig{
 		AuthRequestsPerMinute:    1,
+		RefreshRequestsPerMinute: 1,
 		GeneralRequestsPerMinute: 1,
 		BurstSize:                1,
 		Enabled:                  false,
@@ -117,6 +158,7 @@ func TestRateLimiter_Disabled(t *testing.T) {
 func TestRateLimiter_DifferentClients(t *testing.T) {
 	cfg := &config.RateLimitConfig{
 		AuthRequestsPerMinute:    2,
+		RefreshRequestsPerMinute: 20,
 		GeneralRequestsPerMinute: 2,
 		BurstSize:                5,
 		Enabled:                  true,
@@ -162,7 +204,7 @@ func TestIsAuthEndpoint(t *testing.T) {
 	}{
 		{"/api/v1/auth/login", true},
 		{"/api/v1/auth/register", true},
-		{"/api/v1/auth/refresh", true},
+		{"/api/v1/auth/refresh", false},
 		{"/health", false},
 		{"/api/v1/user/profile", false},
 		{"/swagger/", false},
@@ -173,6 +215,29 @@ func TestIsAuthEndpoint(t *testing.T) {
 			result := IsAuthEndpoint(tt.path)
 			if result != tt.expected {
 				t.Errorf("isAuthEndpoint(%s) = %v, expected %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsRefreshEndpoint(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/api/v1/auth/refresh", true},
+		{"/api/v1/auth/login", false},
+		{"/api/v1/auth/register", false},
+		{"/health", false},
+		{"/api/v1/user/profile", false},
+		{"/swagger/", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := IsRefreshEndpoint(tt.path)
+			if result != tt.expected {
+				t.Errorf("isRefreshEndpoint(%s) = %v, expected %v", tt.path, result, tt.expected)
 			}
 		})
 	}

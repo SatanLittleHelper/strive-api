@@ -56,6 +56,7 @@ type JWTConfig struct {
 
 type RateLimitConfig struct {
 	AuthRequestsPerMinute    int
+	RefreshRequestsPerMinute int
 	GeneralRequestsPerMinute int
 	BurstSize                int
 	Enabled                  bool
@@ -115,6 +116,7 @@ func Load() (*Config, error) {
 		},
 		RateLimit: RateLimitConfig{
 			AuthRequestsPerMinute:    getEnvInt("RATE_LIMIT_AUTH_PER_MINUTE", 5),
+			RefreshRequestsPerMinute: getEnvInt("RATE_LIMIT_REFRESH_PER_MINUTE", 20),
 			GeneralRequestsPerMinute: getEnvInt("RATE_LIMIT_GENERAL_PER_MINUTE", 60),
 			BurstSize:                getEnvInt("RATE_LIMIT_BURST_SIZE", 10),
 			Enabled:                  getEnv("RATE_LIMIT_ENABLED", trueStr) == trueStr,
