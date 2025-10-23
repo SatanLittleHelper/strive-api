@@ -35,7 +35,7 @@ services:
       - key: JWT_CLOCK_SKEW
         value: 2m
       - key: CORS_ALLOWED_ORIGINS
-        value: https://your-production-frontend.com
+        value: http://localhost:4200,http://127.0.0.1:4200,http://192.168.1.186:4200,https://satanlittlehelper.github.io
       - key: CORS_ALLOWED_METHODS
         value: GET,POST,PUT,DELETE,OPTIONS
       - key: CORS_ALLOWED_HEADERS
@@ -49,7 +49,7 @@ services:
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_SAMESITE
-        value: "Strict"
+        value: "None"
       - key: COOKIE_DOMAIN
         value: ""
       - key: RATE_LIMIT_ENABLED
