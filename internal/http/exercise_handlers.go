@@ -161,7 +161,7 @@ func (h *ExerciseHandlers) writeJSONResponse(w http.ResponseWriter, data interfa
 
 // GetExerciseByID returns detailed information about a specific exercise
 // @Summary Get exercise by ID
-// @Description Returns detailed information about a specific exercise including muscle groups, equipment, and alternatives
+// @Description Returns detailed information about a specific exercise including muscle groups, equipment, and variations
 // @Tags exercises
 // @Accept json
 // @Produce json
@@ -288,7 +288,7 @@ func (h *ExerciseHandlers) GetCacheStatus(w http.ResponseWriter, r *http.Request
 
 // RefreshCache manually refreshes the exercise cache
 // @Summary Refresh cache
-// @Description Manually refreshes the exercise cache from ExerciseDB API
+// @Description Manually refreshes the exercise cache from wger API
 // @Tags exercises
 // @Accept json
 // @Produce json

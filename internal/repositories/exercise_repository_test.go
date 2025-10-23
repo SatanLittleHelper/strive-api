@@ -214,16 +214,19 @@ func TestExerciseRepository_SaveExercise(t *testing.T) {
 	ctx := context.Background()
 
 	exercise := &models.Exercise{
-		ID:           uuid.New(),
-		ExerciseDBID: 1,
-		Name:         "Push-up",
-		Description:  stringPtr("Basic push-up exercise"),
-		Instructions: stringPtr("Start in plank position"),
-		Tips:         stringPtr("Keep your body straight"),
-		CachedAt:     time.Now(),
-		ExpiresAt:    time.Now().Add(24 * time.Hour),
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:            uuid.New(),
+		WgerID:        1,
+		WgerUUID:      "test-uuid",
+		Name:          "Push-up",
+		Description:   "Basic push-up exercise",
+		Category:      1,
+		Language:      2,
+		License:       1,
+		LicenseAuthor: "Test Author",
+		CachedAt:      time.Now(),
+		ExpiresAt:     time.Now().Add(24 * time.Hour),
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	repo.On("SaveExercise", ctx, exercise).Return(nil)
@@ -239,11 +242,13 @@ func TestExerciseRepository_SaveMuscleGroup(t *testing.T) {
 	ctx := context.Background()
 
 	muscleGroup := &models.MuscleGroup{
-		ID:           uuid.New(),
-		ExerciseDBID: 1,
-		Name:         "Chest",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:        uuid.New(),
+		WgerID:    1,
+		Name:      "Chest",
+		NameEn:    "Chest",
+		IsFront:   true,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	repo.On("SaveMuscleGroup", ctx, muscleGroup).Return(nil)
@@ -259,11 +264,11 @@ func TestExerciseRepository_SaveEquipment(t *testing.T) {
 	ctx := context.Background()
 
 	equipment := &models.Equipment{
-		ID:           uuid.New(),
-		ExerciseDBID: 1,
-		Name:         "Dumbbell",
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:        uuid.New(),
+		WgerID:    1,
+		Name:      "Dumbbell",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	repo.On("SaveEquipment", ctx, equipment).Return(nil)
@@ -284,8 +289,4 @@ func TestExerciseRepository_ClearCache(t *testing.T) {
 	assert.NoError(t, err)
 
 	repo.AssertExpectations(t)
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

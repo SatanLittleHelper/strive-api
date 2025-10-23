@@ -120,9 +120,9 @@ func setupServices(db *database.Database, cfg *config.Config) *Services {
 	calorieService := services.NewCalorieService(calorieRepo)
 
 	var exerciseService services.ExerciseService
-	if cfg.ExerciseDB.Enabled {
-		exerciseDBClient := clients.NewExerciseDBClient(&cfg.ExerciseDB, logger.New(cfg.Log.Level, cfg.Log.Format))
-		cacheService := services.NewExerciseCacheService(exerciseRepo, exerciseDBClient, logger.New(cfg.Log.Level, cfg.Log.Format), 24*time.Hour)
+	if cfg.Wger.Enabled {
+		wgerClient := clients.NewWgerClient(&cfg.Wger, logger.New(cfg.Log.Level, cfg.Log.Format))
+		cacheService := services.NewExerciseCacheService(exerciseRepo, wgerClient, logger.New(cfg.Log.Level, cfg.Log.Format), 24*time.Hour)
 		exerciseService = services.NewExerciseService(exerciseRepo, cacheService, logger.New(cfg.Log.Level, cfg.Log.Format))
 	} else {
 		exerciseService = nil
