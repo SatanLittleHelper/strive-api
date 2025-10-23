@@ -20,28 +20,28 @@ type ExerciseCacheService interface {
 }
 
 type exerciseCacheService struct {
-	exerciseRepo     repositories.ExerciseRepository
-	exerciseDBClient *clients.ExerciseDBClient
-	logger           *logger.Logger
-	cacheTTL         time.Duration
+	exerciseRepo repositories.ExerciseRepository
+	wgerClient   *clients.WgerClient
+	logger       *logger.Logger
+	cacheTTL     time.Duration
 }
 
 func NewExerciseCacheService(
 	exerciseRepo repositories.ExerciseRepository,
-	exerciseDBClient *clients.ExerciseDBClient,
+	wgerClient *clients.WgerClient,
 	logger *logger.Logger,
 	cacheTTL time.Duration,
 ) ExerciseCacheService {
 	return &exerciseCacheService{
-		exerciseRepo:     exerciseRepo,
-		exerciseDBClient: exerciseDBClient,
-		logger:           logger,
-		cacheTTL:         cacheTTL,
+		exerciseRepo: exerciseRepo,
+		wgerClient:   wgerClient,
+		logger:       logger,
+		cacheTTL:     cacheTTL,
 	}
 }
 
 func (s *exerciseCacheService) RefreshCache(ctx context.Context) error {
-	s.logger.Info("Starting cache refresh from ExerciseDB")
+	s.logger.Info("Starting cache refresh from wger API")
 
 	if err := s.exerciseRepo.ClearCache(ctx); err != nil {
 		return fmt.Errorf("failed to clear existing cache: %w", err)
@@ -77,47 +77,49 @@ func (s *exerciseCacheService) ClearCache(ctx context.Context) error {
 }
 
 func (s *exerciseCacheService) cacheMuscleGroups(ctx context.Context) error {
-	s.logger.Debug("Caching muscle groups from ExerciseDB")
+	s.logger.Debug("Caching muscle groups from wger API")
 
-	muscleGroups, err := s.exerciseDBClient.GetMuscleGroups(ctx)
+	muscles, err := s.wgerClient.GetMuscles(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get muscle groups from ExerciseDB: %w", err)
+		return fmt.Errorf("failed to get muscles from wger API: %w", err)
 	}
 
-	for _, mg := range muscleGroups {
+	for _, muscle := range muscles {
 		muscleGroup := &models.MuscleGroup{
-			ID:           uuid.New(),
-			ExerciseDBID: mg.ID,
-			Name:         mg.Name,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			ID:        uuid.New(),
+			WgerID:    muscle.ID,
+			Name:      muscle.Name,
+			NameEn:    muscle.NameEn,
+			IsFront:   muscle.IsFront,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
 
 		if err := s.exerciseRepo.SaveMuscleGroup(ctx, muscleGroup); err != nil {
-			s.logger.Error("Failed to save muscle group", "error", err, "muscle_group", mg.Name)
+			s.logger.Error("Failed to save muscle group", "error", err, "muscle_group", muscle.Name)
 			continue
 		}
 	}
 
-	s.logger.Info("Successfully cached muscle groups", "count", len(muscleGroups))
+	s.logger.Info("Successfully cached muscle groups", "count", len(muscles))
 	return nil
 }
 
 func (s *exerciseCacheService) cacheEquipment(ctx context.Context) error {
-	s.logger.Debug("Caching equipment from ExerciseDB")
+	s.logger.Debug("Caching equipment from wger API")
 
-	equipment, err := s.exerciseDBClient.GetEquipment(ctx)
+	equipment, err := s.wgerClient.GetEquipment(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get equipment from ExerciseDB: %w", err)
+		return fmt.Errorf("failed to get equipment from wger API: %w", err)
 	}
 
 	for _, eq := range equipment {
 		equipmentModel := &models.Equipment{
-			ID:           uuid.New(),
-			ExerciseDBID: eq.ID,
-			Name:         eq.Name,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			ID:        uuid.New(),
+			WgerID:    eq.ID,
+			Name:      eq.Name,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
 
 		if err := s.exerciseRepo.SaveEquipment(ctx, equipmentModel); err != nil {
@@ -131,11 +133,11 @@ func (s *exerciseCacheService) cacheEquipment(ctx context.Context) error {
 }
 
 func (s *exerciseCacheService) cacheExercises(ctx context.Context) error {
-	s.logger.Debug("Caching exercises from ExerciseDB")
+	s.logger.Debug("Caching exercises from wger API")
 
-	exercises, err := s.exerciseDBClient.GetAllExercises(ctx)
+	exercises, err := s.wgerClient.GetAllExercises(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get exercises from ExerciseDB: %w", err)
+		return fmt.Errorf("failed to get exercises from wger API: %w", err)
 	}
 
 	now := time.Now()
@@ -145,19 +147,15 @@ func (s *exerciseCacheService) cacheExercises(ctx context.Context) error {
 		ex := &exercises[i]
 		exercise := &models.Exercise{
 			ID:            uuid.New(),
-			ExerciseDBID:  ex.ID,
+			WgerID:        ex.ID,
+			WgerUUID:      ex.UUID,
 			Name:          ex.Name,
-			Description:   stringPtr(ex.Description),
-			Instructions:  stringPtr(ex.Description),
-			Tips:          stringPtr(ex.Description),
-			Category:      intPtr(ex.Category),
-			Language:      intPtr(ex.Language),
-			License:       intPtr(ex.License),
-			LicenseAuthor: stringPtr(ex.LicenseAuthor),
-			Status:        stringPtr(ex.Status),
-			NameOriginal:  stringPtr(ex.NameOriginal),
+			Description:   ex.Description,
+			Category:      ex.Category,
+			Language:      ex.Language,
+			License:       ex.License,
+			LicenseAuthor: ex.LicenseAuthor,
 			CreationDate:  parseDate(ex.CreationDate),
-			UUID:          stringPtr(ex.UUID),
 			CachedAt:      now,
 			ExpiresAt:     expiresAt,
 			CreatedAt:     now,
@@ -176,6 +174,8 @@ func (s *exerciseCacheService) cacheExercises(ctx context.Context) error {
 		if err := s.cacheExerciseEquipment(ctx, exercise.ID, ex.Equipment); err != nil {
 			s.logger.Error("Failed to cache exercise equipment", "error", err, "exercise", ex.Name)
 		}
+
+		s.cacheExerciseVariations(ctx, exercise.ID, ex.Variations)
 	}
 
 	s.logger.Info("Successfully cached exercises", "count", len(exercises))
@@ -194,7 +194,7 @@ func (s *exerciseCacheService) cacheExerciseMuscleGroups(
 
 	muscleGroupMap := make(map[int]uuid.UUID)
 	for _, mg := range muscleGroups {
-		muscleGroupMap[mg.ExerciseDBID] = mg.ID
+		muscleGroupMap[mg.WgerID] = mg.ID
 	}
 
 	for _, muscleID := range primaryMuscles {
@@ -224,7 +224,7 @@ func (s *exerciseCacheService) cacheExerciseEquipment(ctx context.Context, exerc
 
 	equipmentMap := make(map[int]uuid.UUID)
 	for _, eq := range equipment {
-		equipmentMap[eq.ExerciseDBID] = eq.ID
+		equipmentMap[eq.WgerID] = eq.ID
 	}
 
 	for _, equipmentID := range equipmentIDs {
@@ -238,18 +238,18 @@ func (s *exerciseCacheService) cacheExerciseEquipment(ctx context.Context, exerc
 	return nil
 }
 
-func stringPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
+func (s *exerciseCacheService) cacheExerciseVariations(ctx context.Context, exerciseID uuid.UUID, variationIDs []int) {
+	for _, variationWgerID := range variationIDs {
+		variation, err := s.exerciseRepo.GetByWgerID(ctx, variationWgerID)
+		if err != nil {
+			s.logger.Warn("Variation not found in cache", "wger_id", variationWgerID)
+			continue
+		}
 
-func intPtr(i int) *int {
-	if i == 0 {
-		return nil
+		if err := s.exerciseRepo.SaveExerciseVariation(ctx, exerciseID, variation.ID); err != nil {
+			s.logger.Warn("Failed to save exercise variation", "error", err, "variation_id", variationWgerID)
+		}
 	}
-	return &i
 }
 
 func parseDate(dateStr string) *time.Time {

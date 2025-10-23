@@ -14,9 +14,11 @@ import (
 type ExerciseRepository interface {
 	GetAll(ctx context.Context, filters *models.ExerciseFilters) (*models.ExerciseListResponse, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Exercise, error)
-	GetByExerciseDBID(ctx context.Context, exerciseDBID int) (*models.Exercise, error)
+	GetByWgerID(ctx context.Context, wgerID int) (*models.Exercise, error)
 	GetMuscleGroups(ctx context.Context) ([]models.MuscleGroup, error)
+	GetMuscleGroupByWgerID(ctx context.Context, wgerID int) (*models.MuscleGroup, error)
 	GetEquipment(ctx context.Context) ([]models.Equipment, error)
+	GetEquipmentByWgerID(ctx context.Context, wgerID int) (*models.Equipment, error)
 	GetCacheStatus(ctx context.Context) (*models.CacheStatus, error)
 	IsCacheValid(ctx context.Context) (bool, error)
 	ClearCache(ctx context.Context) error
@@ -25,7 +27,7 @@ type ExerciseRepository interface {
 	SaveEquipment(ctx context.Context, equipment *models.Equipment) error
 	SaveExerciseMuscleGroup(ctx context.Context, exerciseID, muscleGroupID uuid.UUID, isPrimary bool) error
 	SaveExerciseEquipment(ctx context.Context, exerciseID, equipmentID uuid.UUID) error
-	SaveExerciseAlternative(ctx context.Context, exerciseID, alternativeID uuid.UUID) error
+	SaveExerciseVariation(ctx context.Context, exerciseID, variationID uuid.UUID) error
 }
 
 type exerciseRepository struct {
@@ -93,9 +95,9 @@ func (r *exerciseRepository) GetAll(ctx context.Context, filters *models.Exercis
 	offset := (filters.Page - 1) * limit
 
 	query := fmt.Sprintf(`
-		SELECT DISTINCT e.id, e.exercise_db_id, e.name, e.description, e.instructions, e.tips,
-		       e.category, e.language, e.license, e.license_author, e.status, e.name_original,
-		       e.creation_date, e.uuid, e.cached_at, e.expires_at, e.created_at, e.updated_at
+		SELECT DISTINCT e.id, e.wger_id, e.wger_uuid, e.name, e.description,
+		       e.category, e.language, e.license, e.license_author,
+		       e.creation_date, e.cached_at, e.expires_at, e.created_at, e.updated_at
 		FROM exercises e
 		%s
 		ORDER BY e.name
@@ -115,19 +117,15 @@ func (r *exerciseRepository) GetAll(ctx context.Context, filters *models.Exercis
 		exercise := models.Exercise{}
 		err := rows.Scan(
 			&exercise.ID,
-			&exercise.ExerciseDBID,
+			&exercise.WgerID,
+			&exercise.WgerUUID,
 			&exercise.Name,
 			&exercise.Description,
-			&exercise.Instructions,
-			&exercise.Tips,
 			&exercise.Category,
 			&exercise.Language,
 			&exercise.License,
 			&exercise.LicenseAuthor,
-			&exercise.Status,
-			&exercise.NameOriginal,
 			&exercise.CreationDate,
-			&exercise.UUID,
 			&exercise.CachedAt,
 			&exercise.ExpiresAt,
 			&exercise.CreatedAt,
@@ -149,11 +147,11 @@ func (r *exerciseRepository) GetAll(ctx context.Context, filters *models.Exercis
 		}
 		exercise.Equipment = equipment
 
-		alternatives, err := r.getAlternativesForExercise(ctx, exercise.ID)
+		variations, err := r.getVariationsForExercise(ctx, exercise.ID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get alternatives for exercise: %w", err)
+			return nil, fmt.Errorf("failed to get variations for exercise: %w", err)
 		}
-		exercise.Alternatives = alternatives
+		exercise.Variations = variations
 
 		exercises = append(exercises, exercise)
 	}
@@ -168,9 +166,9 @@ func (r *exerciseRepository) GetAll(ctx context.Context, filters *models.Exercis
 
 func (r *exerciseRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Exercise, error) {
 	query := `
-		SELECT id, exercise_db_id, name, description, instructions, tips,
-		       category, language, license, license_author, status, name_original,
-		       creation_date, uuid, cached_at, expires_at, created_at, updated_at
+		SELECT id, wger_id, wger_uuid, name, description,
+		       category, language, license, license_author,
+		       creation_date, cached_at, expires_at, created_at, updated_at
 		FROM exercises
 		WHERE id = $1
 	`
@@ -179,19 +177,15 @@ func (r *exerciseRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 	exercise := &models.Exercise{}
 	err := row.Scan(
 		&exercise.ID,
-		&exercise.ExerciseDBID,
+		&exercise.WgerID,
+		&exercise.WgerUUID,
 		&exercise.Name,
 		&exercise.Description,
-		&exercise.Instructions,
-		&exercise.Tips,
 		&exercise.Category,
 		&exercise.Language,
 		&exercise.License,
 		&exercise.LicenseAuthor,
-		&exercise.Status,
-		&exercise.NameOriginal,
 		&exercise.CreationDate,
-		&exercise.UUID,
 		&exercise.CachedAt,
 		&exercise.ExpiresAt,
 		&exercise.CreatedAt,
@@ -213,48 +207,44 @@ func (r *exerciseRepository) GetByID(ctx context.Context, id uuid.UUID) (*models
 	}
 	exercise.Equipment = equipment
 
-	alternatives, err := r.getAlternativesForExercise(ctx, exercise.ID)
+	variations, err := r.getVariationsForExercise(ctx, exercise.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get alternatives for exercise: %w", err)
+		return nil, fmt.Errorf("failed to get variations for exercise: %w", err)
 	}
-	exercise.Alternatives = alternatives
+	exercise.Variations = variations
 
 	return exercise, nil
 }
 
-func (r *exerciseRepository) GetByExerciseDBID(ctx context.Context, exerciseDBID int) (*models.Exercise, error) {
+func (r *exerciseRepository) GetByWgerID(ctx context.Context, wgerID int) (*models.Exercise, error) {
 	query := `
-		SELECT id, exercise_db_id, name, description, instructions, tips,
-		       category, language, license, license_author, status, name_original,
-		       creation_date, uuid, cached_at, expires_at, created_at, updated_at
+		SELECT id, wger_id, wger_uuid, name, description,
+		       category, language, license, license_author,
+		       creation_date, cached_at, expires_at, created_at, updated_at
 		FROM exercises
-		WHERE exercise_db_id = $1
+		WHERE wger_id = $1
 	`
 
-	row := r.pool.QueryRow(ctx, query, exerciseDBID)
+	row := r.pool.QueryRow(ctx, query, wgerID)
 	exercise := &models.Exercise{}
 	err := row.Scan(
 		&exercise.ID,
-		&exercise.ExerciseDBID,
+		&exercise.WgerID,
+		&exercise.WgerUUID,
 		&exercise.Name,
 		&exercise.Description,
-		&exercise.Instructions,
-		&exercise.Tips,
 		&exercise.Category,
 		&exercise.Language,
 		&exercise.License,
 		&exercise.LicenseAuthor,
-		&exercise.Status,
-		&exercise.NameOriginal,
 		&exercise.CreationDate,
-		&exercise.UUID,
 		&exercise.CachedAt,
 		&exercise.ExpiresAt,
 		&exercise.CreatedAt,
 		&exercise.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get exercise by exercise_db_id: %w", err)
+		return nil, fmt.Errorf("failed to get exercise by wger_id: %w", err)
 	}
 
 	return exercise, nil
@@ -262,7 +252,7 @@ func (r *exerciseRepository) GetByExerciseDBID(ctx context.Context, exerciseDBID
 
 func (r *exerciseRepository) GetMuscleGroups(ctx context.Context) ([]models.MuscleGroup, error) {
 	query := `
-		SELECT id, exercise_db_id, name, created_at, updated_at
+		SELECT id, wger_id, name, name_en, is_front, created_at, updated_at
 		FROM muscle_groups
 		ORDER BY name
 	`
@@ -276,7 +266,7 @@ func (r *exerciseRepository) GetMuscleGroups(ctx context.Context) ([]models.Musc
 	muscleGroups := []models.MuscleGroup{}
 	for rows.Next() {
 		mg := models.MuscleGroup{}
-		err := rows.Scan(&mg.ID, &mg.ExerciseDBID, &mg.Name, &mg.CreatedAt, &mg.UpdatedAt)
+		err := rows.Scan(&mg.ID, &mg.WgerID, &mg.Name, &mg.NameEn, &mg.IsFront, &mg.CreatedAt, &mg.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan muscle group: %w", err)
 		}
@@ -286,9 +276,26 @@ func (r *exerciseRepository) GetMuscleGroups(ctx context.Context) ([]models.Musc
 	return muscleGroups, nil
 }
 
+func (r *exerciseRepository) GetMuscleGroupByWgerID(ctx context.Context, wgerID int) (*models.MuscleGroup, error) {
+	query := `
+		SELECT id, wger_id, name, name_en, is_front, created_at, updated_at
+		FROM muscle_groups
+		WHERE wger_id = $1
+	`
+
+	row := r.pool.QueryRow(ctx, query, wgerID)
+	mg := &models.MuscleGroup{}
+	err := row.Scan(&mg.ID, &mg.WgerID, &mg.Name, &mg.NameEn, &mg.IsFront, &mg.CreatedAt, &mg.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get muscle group by wger_id: %w", err)
+	}
+
+	return mg, nil
+}
+
 func (r *exerciseRepository) GetEquipment(ctx context.Context) ([]models.Equipment, error) {
 	query := `
-		SELECT id, exercise_db_id, name, created_at, updated_at
+		SELECT id, wger_id, name, created_at, updated_at
 		FROM equipment
 		ORDER BY name
 	`
@@ -302,7 +309,7 @@ func (r *exerciseRepository) GetEquipment(ctx context.Context) ([]models.Equipme
 	equipment := []models.Equipment{}
 	for rows.Next() {
 		eq := models.Equipment{}
-		err := rows.Scan(&eq.ID, &eq.ExerciseDBID, &eq.Name, &eq.CreatedAt, &eq.UpdatedAt)
+		err := rows.Scan(&eq.ID, &eq.WgerID, &eq.Name, &eq.CreatedAt, &eq.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan equipment: %w", err)
 		}
@@ -310,6 +317,23 @@ func (r *exerciseRepository) GetEquipment(ctx context.Context) ([]models.Equipme
 	}
 
 	return equipment, nil
+}
+
+func (r *exerciseRepository) GetEquipmentByWgerID(ctx context.Context, wgerID int) (*models.Equipment, error) {
+	query := `
+		SELECT id, wger_id, name, created_at, updated_at
+		FROM equipment
+		WHERE wger_id = $1
+	`
+
+	row := r.pool.QueryRow(ctx, query, wgerID)
+	eq := &models.Equipment{}
+	err := row.Scan(&eq.ID, &eq.WgerID, &eq.Name, &eq.CreatedAt, &eq.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get equipment by wger_id: %w", err)
+	}
+
+	return eq, nil
 }
 
 func (r *exerciseRepository) GetCacheStatus(ctx context.Context) (*models.CacheStatus, error) {
@@ -363,7 +387,7 @@ func (r *exerciseRepository) IsCacheValid(ctx context.Context) (bool, error) {
 
 func (r *exerciseRepository) ClearCache(ctx context.Context) error {
 	queries := []string{
-		"DELETE FROM exercise_alternatives",
+		"DELETE FROM exercise_variations",
 		"DELETE FROM exercise_equipment",
 		"DELETE FROM exercise_muscle_groups",
 		"DELETE FROM exercises",
@@ -384,25 +408,21 @@ func (r *exerciseRepository) ClearCache(ctx context.Context) error {
 func (r *exerciseRepository) SaveExercise(ctx context.Context, exercise *models.Exercise) error {
 	query := `
 		INSERT INTO exercises (
-			id, exercise_db_id, name, description, instructions, tips,
-			category, language, license, license_author, status, name_original,
-			creation_date, uuid, cached_at, expires_at, created_at, updated_at
+			id, wger_id, wger_uuid, name, description,
+			category, language, license, license_author,
+			creation_date, cached_at, expires_at, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 		)
-		ON CONFLICT (exercise_db_id) DO UPDATE SET
+		ON CONFLICT (wger_id) DO UPDATE SET
+			wger_uuid = EXCLUDED.wger_uuid,
 			name = EXCLUDED.name,
 			description = EXCLUDED.description,
-			instructions = EXCLUDED.instructions,
-			tips = EXCLUDED.tips,
 			category = EXCLUDED.category,
 			language = EXCLUDED.language,
 			license = EXCLUDED.license,
 			license_author = EXCLUDED.license_author,
-			status = EXCLUDED.status,
-			name_original = EXCLUDED.name_original,
 			creation_date = EXCLUDED.creation_date,
-			uuid = EXCLUDED.uuid,
 			cached_at = EXCLUDED.cached_at,
 			expires_at = EXCLUDED.expires_at,
 			updated_at = EXCLUDED.updated_at
@@ -410,19 +430,15 @@ func (r *exerciseRepository) SaveExercise(ctx context.Context, exercise *models.
 
 	_, err := r.pool.Exec(ctx, query,
 		exercise.ID,
-		exercise.ExerciseDBID,
+		exercise.WgerID,
+		exercise.WgerUUID,
 		exercise.Name,
 		exercise.Description,
-		exercise.Instructions,
-		exercise.Tips,
 		exercise.Category,
 		exercise.Language,
 		exercise.License,
 		exercise.LicenseAuthor,
-		exercise.Status,
-		exercise.NameOriginal,
 		exercise.CreationDate,
-		exercise.UUID,
 		exercise.CachedAt,
 		exercise.ExpiresAt,
 		exercise.CreatedAt,
@@ -437,17 +453,21 @@ func (r *exerciseRepository) SaveExercise(ctx context.Context, exercise *models.
 
 func (r *exerciseRepository) SaveMuscleGroup(ctx context.Context, muscleGroup *models.MuscleGroup) error {
 	query := `
-		INSERT INTO muscle_groups (id, exercise_db_id, name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (exercise_db_id) DO UPDATE SET
+		INSERT INTO muscle_groups (id, wger_id, name, name_en, is_front, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (wger_id) DO UPDATE SET
 			name = EXCLUDED.name,
+			name_en = EXCLUDED.name_en,
+			is_front = EXCLUDED.is_front,
 			updated_at = EXCLUDED.updated_at
 	`
 
 	_, err := r.pool.Exec(ctx, query,
 		muscleGroup.ID,
-		muscleGroup.ExerciseDBID,
+		muscleGroup.WgerID,
 		muscleGroup.Name,
+		muscleGroup.NameEn,
+		muscleGroup.IsFront,
 		muscleGroup.CreatedAt,
 		muscleGroup.UpdatedAt,
 	)
@@ -460,16 +480,16 @@ func (r *exerciseRepository) SaveMuscleGroup(ctx context.Context, muscleGroup *m
 
 func (r *exerciseRepository) SaveEquipment(ctx context.Context, equipment *models.Equipment) error {
 	query := `
-		INSERT INTO equipment (id, exercise_db_id, name, created_at, updated_at)
+		INSERT INTO equipment (id, wger_id, name, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (exercise_db_id) DO UPDATE SET
+		ON CONFLICT (wger_id) DO UPDATE SET
 			name = EXCLUDED.name,
 			updated_at = EXCLUDED.updated_at
 	`
 
 	_, err := r.pool.Exec(ctx, query,
 		equipment.ID,
-		equipment.ExerciseDBID,
+		equipment.WgerID,
 		equipment.Name,
 		equipment.CreatedAt,
 		equipment.UpdatedAt,
@@ -511,16 +531,16 @@ func (r *exerciseRepository) SaveExerciseEquipment(ctx context.Context, exercise
 	return nil
 }
 
-func (r *exerciseRepository) SaveExerciseAlternative(ctx context.Context, exerciseID, alternativeID uuid.UUID) error {
+func (r *exerciseRepository) SaveExerciseVariation(ctx context.Context, exerciseID, variationID uuid.UUID) error {
 	query := `
-		INSERT INTO exercise_alternatives (exercise_id, alternative_exercise_id, created_at)
+		INSERT INTO exercise_variations (exercise_id, variation_exercise_id, created_at)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (exercise_id, alternative_exercise_id) DO NOTHING
+		ON CONFLICT (exercise_id, variation_exercise_id) DO NOTHING
 	`
 
-	_, err := r.pool.Exec(ctx, query, exerciseID, alternativeID, time.Now())
+	_, err := r.pool.Exec(ctx, query, exerciseID, variationID, time.Now())
 	if err != nil {
-		return fmt.Errorf("failed to save exercise alternative: %w", err)
+		return fmt.Errorf("failed to save exercise variation: %w", err)
 	}
 
 	return nil
@@ -528,7 +548,7 @@ func (r *exerciseRepository) SaveExerciseAlternative(ctx context.Context, exerci
 
 func (r *exerciseRepository) getMuscleGroupsForExercise(ctx context.Context, exerciseID uuid.UUID) ([]models.MuscleGroup, error) {
 	query := `
-		SELECT mg.id, mg.exercise_db_id, mg.name, mg.created_at, mg.updated_at
+		SELECT mg.id, mg.wger_id, mg.name, mg.name_en, mg.is_front, mg.created_at, mg.updated_at
 		FROM muscle_groups mg
 		JOIN exercise_muscle_groups emg ON mg.id = emg.muscle_group_id
 		WHERE emg.exercise_id = $1
@@ -544,7 +564,7 @@ func (r *exerciseRepository) getMuscleGroupsForExercise(ctx context.Context, exe
 	muscleGroups := []models.MuscleGroup{}
 	for rows.Next() {
 		mg := models.MuscleGroup{}
-		err := rows.Scan(&mg.ID, &mg.ExerciseDBID, &mg.Name, &mg.CreatedAt, &mg.UpdatedAt)
+		err := rows.Scan(&mg.ID, &mg.WgerID, &mg.Name, &mg.NameEn, &mg.IsFront, &mg.CreatedAt, &mg.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan muscle group: %w", err)
 		}
@@ -556,7 +576,7 @@ func (r *exerciseRepository) getMuscleGroupsForExercise(ctx context.Context, exe
 
 func (r *exerciseRepository) getEquipmentForExercise(ctx context.Context, exerciseID uuid.UUID) ([]models.Equipment, error) {
 	query := `
-		SELECT e.id, e.exercise_db_id, e.name, e.created_at, e.updated_at
+		SELECT e.id, e.wger_id, e.name, e.created_at, e.updated_at
 		FROM equipment e
 		JOIN exercise_equipment ee ON e.id = ee.equipment_id
 		WHERE ee.exercise_id = $1
@@ -572,7 +592,7 @@ func (r *exerciseRepository) getEquipmentForExercise(ctx context.Context, exerci
 	equipment := []models.Equipment{}
 	for rows.Next() {
 		eq := models.Equipment{}
-		err := rows.Scan(&eq.ID, &eq.ExerciseDBID, &eq.Name, &eq.CreatedAt, &eq.UpdatedAt)
+		err := rows.Scan(&eq.ID, &eq.WgerID, &eq.Name, &eq.CreatedAt, &eq.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan equipment: %w", err)
 		}
@@ -582,51 +602,47 @@ func (r *exerciseRepository) getEquipmentForExercise(ctx context.Context, exerci
 	return equipment, nil
 }
 
-func (r *exerciseRepository) getAlternativesForExercise(ctx context.Context, exerciseID uuid.UUID) ([]models.Exercise, error) {
+func (r *exerciseRepository) getVariationsForExercise(ctx context.Context, exerciseID uuid.UUID) ([]models.Exercise, error) {
 	query := `
-		SELECT e.id, e.exercise_db_id, e.name, e.description, e.instructions, e.tips,
-		       e.category, e.language, e.license, e.license_author, e.status, e.name_original,
-		       e.creation_date, e.uuid, e.cached_at, e.expires_at, e.created_at, e.updated_at
+		SELECT e.id, e.wger_id, e.wger_uuid, e.name, e.description,
+		       e.category, e.language, e.license, e.license_author,
+		       e.creation_date, e.cached_at, e.expires_at, e.created_at, e.updated_at
 		FROM exercises e
-		JOIN exercise_alternatives ea ON e.id = ea.alternative_exercise_id
-		WHERE ea.exercise_id = $1
+		JOIN exercise_variations ev ON e.id = ev.variation_exercise_id
+		WHERE ev.exercise_id = $1
 		ORDER BY e.name
 	`
 
 	rows, err := r.pool.Query(ctx, query, exerciseID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get alternatives for exercise: %w", err)
+		return nil, fmt.Errorf("failed to get variations for exercise: %w", err)
 	}
 	defer rows.Close()
 
-	alternatives := []models.Exercise{}
+	variations := []models.Exercise{}
 	for rows.Next() {
-		alt := models.Exercise{}
+		variation := models.Exercise{}
 		err := rows.Scan(
-			&alt.ID,
-			&alt.ExerciseDBID,
-			&alt.Name,
-			&alt.Description,
-			&alt.Instructions,
-			&alt.Tips,
-			&alt.Category,
-			&alt.Language,
-			&alt.License,
-			&alt.LicenseAuthor,
-			&alt.Status,
-			&alt.NameOriginal,
-			&alt.CreationDate,
-			&alt.UUID,
-			&alt.CachedAt,
-			&alt.ExpiresAt,
-			&alt.CreatedAt,
-			&alt.UpdatedAt,
+			&variation.ID,
+			&variation.WgerID,
+			&variation.WgerUUID,
+			&variation.Name,
+			&variation.Description,
+			&variation.Category,
+			&variation.Language,
+			&variation.License,
+			&variation.LicenseAuthor,
+			&variation.CreationDate,
+			&variation.CachedAt,
+			&variation.ExpiresAt,
+			&variation.CreatedAt,
+			&variation.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan alternative exercise: %w", err)
+			return nil, fmt.Errorf("failed to scan variation exercise: %w", err)
 		}
-		alternatives = append(alternatives, alt)
+		variations = append(variations, variation)
 	}
 
-	return alternatives, nil
+	return variations, nil
 }

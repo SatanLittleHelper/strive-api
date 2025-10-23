@@ -26,9 +26,19 @@ func (m *MockExerciseRepository) GetByID(ctx context.Context, id uuid.UUID) (*mo
 	return args.Get(0).(*models.Exercise), args.Error(1)
 }
 
-func (m *MockExerciseRepository) GetByExerciseDBID(ctx context.Context, exerciseDBID int) (*models.Exercise, error) {
-	args := m.Called(ctx, exerciseDBID)
+func (m *MockExerciseRepository) GetByWgerID(ctx context.Context, wgerID int) (*models.Exercise, error) {
+	args := m.Called(ctx, wgerID)
 	return args.Get(0).(*models.Exercise), args.Error(1)
+}
+
+func (m *MockExerciseRepository) GetMuscleGroupByWgerID(ctx context.Context, wgerID int) (*models.MuscleGroup, error) {
+	args := m.Called(ctx, wgerID)
+	return args.Get(0).(*models.MuscleGroup), args.Error(1)
+}
+
+func (m *MockExerciseRepository) GetEquipmentByWgerID(ctx context.Context, wgerID int) (*models.Equipment, error) {
+	args := m.Called(ctx, wgerID)
+	return args.Get(0).(*models.Equipment), args.Error(1)
 }
 
 func (m *MockExerciseRepository) GetMuscleGroups(ctx context.Context) ([]models.MuscleGroup, error) {
@@ -81,8 +91,8 @@ func (m *MockExerciseRepository) SaveExerciseEquipment(ctx context.Context, exer
 	return args.Error(0)
 }
 
-func (m *MockExerciseRepository) SaveExerciseAlternative(ctx context.Context, exerciseID, alternativeID uuid.UUID) error {
-	args := m.Called(ctx, exerciseID, alternativeID)
+func (m *MockExerciseRepository) SaveExerciseVariation(ctx context.Context, exerciseID, variationID uuid.UUID) error {
+	args := m.Called(ctx, exerciseID, variationID)
 	return args.Error(0)
 }
 

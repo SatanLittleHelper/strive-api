@@ -22,7 +22,7 @@ type Config struct {
 	CORS            CORSConfig
 	SecurityHeaders SecurityHeadersConfig
 	Cookie          CookieConfig
-	ExerciseDB      ExerciseDBConfig
+	Wger            WgerConfig
 }
 
 type ServerConfig struct {
@@ -87,8 +87,9 @@ type CookieConfig struct {
 	Domain   string
 }
 
-type ExerciseDBConfig struct {
+type WgerConfig struct {
 	BaseURL    string
+	APIKey     string
 	Timeout    time.Duration
 	RetryCount int
 	Enabled    bool
@@ -157,11 +158,12 @@ func Load() (*Config, error) {
 			SameSite: parseSameSite(getEnv("COOKIE_SAMESITE", "Strict")),
 			Domain:   getEnv("COOKIE_DOMAIN", ""),
 		},
-		ExerciseDB: ExerciseDBConfig{
-			BaseURL:    getEnv("EXERCISEDB_BASE_URL", "https://exercise.hellogym.io"),
-			Timeout:    getEnvDuration("EXERCISEDB_TIMEOUT", 30*time.Second),
-			RetryCount: getEnvInt("EXERCISEDB_RETRY_COUNT", 3),
-			Enabled:    getEnv("EXERCISEDB_ENABLED", trueStr) == trueStr,
+		Wger: WgerConfig{
+			BaseURL:    getEnv("WGER_API_BASE_URL", "https://wger.de/api/v2"),
+			APIKey:     getEnv("WGER_API_KEY", ""),
+			Timeout:    getEnvDuration("WGER_API_TIMEOUT", 30*time.Second),
+			RetryCount: getEnvInt("WGER_API_RETRY_COUNT", 3),
+			Enabled:    getEnv("WGER_API_ENABLED", trueStr) == trueStr,
 		},
 	}
 

@@ -7,41 +7,39 @@ import (
 )
 
 type MuscleGroup struct {
-	ID           uuid.UUID `json:"id" db:"id"`
-	ExerciseDBID int       `json:"-" db:"exercise_db_id"`
-	Name         string    `json:"name" db:"name"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID        uuid.UUID `json:"id" db:"id"`
+	WgerID    int       `json:"-" db:"wger_id"`
+	Name      string    `json:"name" db:"name"`
+	NameEn    string    `json:"name_en" db:"name_en"`
+	IsFront   bool      `json:"is_front" db:"is_front"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Equipment struct {
-	ID           uuid.UUID `json:"id" db:"id"`
-	ExerciseDBID int       `json:"-" db:"exercise_db_id"`
-	Name         string    `json:"name" db:"name"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID        uuid.UUID `json:"id" db:"id"`
+	WgerID    int       `json:"-" db:"wger_id"`
+	Name      string    `json:"name" db:"name"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Exercise struct {
 	ID            uuid.UUID     `json:"id" db:"id"`
-	ExerciseDBID  int           `json:"-" db:"exercise_db_id"`
+	WgerID        int           `json:"-" db:"wger_id"`
+	WgerUUID      string        `json:"-" db:"wger_uuid"`
 	Name          string        `json:"name" db:"name"`
-	Description   *string       `json:"description,omitempty" db:"description"`
-	Instructions  *string       `json:"instructions,omitempty" db:"instructions"`
-	Tips          *string       `json:"tips,omitempty" db:"tips"`
-	Category      *int          `json:"category,omitempty" db:"category"`
-	Language      *int          `json:"language,omitempty" db:"language"`
-	License       *int          `json:"license,omitempty" db:"license"`
-	LicenseAuthor *string       `json:"license_author,omitempty" db:"license_author"`
-	Status        *string       `json:"status,omitempty" db:"status"`
-	NameOriginal  *string       `json:"name_original,omitempty" db:"name_original"`
+	Description   string        `json:"description,omitempty" db:"description"`
+	Category      int           `json:"category,omitempty" db:"category"`
+	Language      int           `json:"language,omitempty" db:"language"`
+	License       int           `json:"license,omitempty" db:"license"`
+	LicenseAuthor string        `json:"license_author,omitempty" db:"license_author"`
 	CreationDate  *time.Time    `json:"creation_date,omitempty" db:"creation_date"`
-	UUID          *string       `json:"uuid,omitempty" db:"uuid"`
 	CachedAt      time.Time     `json:"cached_at" db:"cached_at"`
 	ExpiresAt     time.Time     `json:"expires_at" db:"expires_at"`
 	MuscleGroups  []MuscleGroup `json:"muscle_groups,omitempty"`
 	Equipment     []Equipment   `json:"equipment,omitempty"`
-	Alternatives  []Exercise    `json:"alternatives,omitempty"`
+	Variations    []Exercise    `json:"variations,omitempty"`
 	CreatedAt     time.Time     `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time     `json:"updated_at" db:"updated_at"`
 }
