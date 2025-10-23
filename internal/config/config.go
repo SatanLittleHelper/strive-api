@@ -22,6 +22,7 @@ type Config struct {
 	CORS            CORSConfig
 	SecurityHeaders SecurityHeadersConfig
 	Cookie          CookieConfig
+	ExerciseDB      ExerciseDBConfig
 }
 
 type ServerConfig struct {
@@ -83,6 +84,14 @@ type SecurityHeadersConfig struct {
 type CookieConfig struct {
 	Secure   bool
 	SameSite http.SameSite
+	Domain   string
+}
+
+type ExerciseDBConfig struct {
+	BaseURL    string
+	Timeout    time.Duration
+	RetryCount int
+	Enabled    bool
 }
 
 func Load() (*Config, error) {
@@ -146,6 +155,13 @@ func Load() (*Config, error) {
 		Cookie: CookieConfig{
 			Secure:   getEnv("COOKIE_SECURE", "true") == trueStr,
 			SameSite: parseSameSite(getEnv("COOKIE_SAMESITE", "Strict")),
+			Domain:   getEnv("COOKIE_DOMAIN", ""),
+		},
+		ExerciseDB: ExerciseDBConfig{
+			BaseURL:    getEnv("EXERCISEDB_BASE_URL", "https://exercise.hellogym.io"),
+			Timeout:    getEnvDuration("EXERCISEDB_TIMEOUT", 30*time.Second),
+			RetryCount: getEnvInt("EXERCISEDB_RETRY_COUNT", 3),
+			Enabled:    getEnv("EXERCISEDB_ENABLED", trueStr) == trueStr,
 		},
 	}
 
