@@ -203,17 +203,16 @@ func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, 
 	calorieProtectedHandler := httphandler.AuthMiddleware(authService, logger)(calorieProtectedMux)
 	mux.Handle("/api/v1/calorie/", http.StripPrefix("/api/v1/calorie", calorieProtectedHandler))
 
-	// Exercise protected routes
 	if handlers.Exercise != nil {
 		exerciseProtectedMux := http.NewServeMux()
-		exerciseProtectedMux.HandleFunc("", handlers.Exercise.GetExercises)
-		exerciseProtectedMux.HandleFunc("/", handlers.Exercise.GetExerciseByID)
+		exerciseProtectedMux.HandleFunc("/", handlers.Exercise.GetExercises)
+		exerciseProtectedMux.HandleFunc("/{id}", handlers.Exercise.GetExerciseByID)
 		exerciseProtectedMux.HandleFunc("/muscle-groups", handlers.Exercise.GetMuscleGroups)
 		exerciseProtectedMux.HandleFunc("/equipment", handlers.Exercise.GetEquipment)
 		exerciseProtectedMux.HandleFunc("/cache/status", handlers.Exercise.GetCacheStatus)
 		exerciseProtectedMux.HandleFunc("/cache/refresh", handlers.Exercise.RefreshCache)
 		exerciseProtectedHandler := httphandler.AuthMiddleware(authService, logger)(exerciseProtectedMux)
-		mux.Handle("/api/v1/exercises", http.StripPrefix("/api/v1/exercises", exerciseProtectedHandler))
+		mux.Handle("/api/v1/exercises/", http.StripPrefix("/api/v1/exercises", exerciseProtectedHandler))
 	}
 }
 
