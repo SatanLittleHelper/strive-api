@@ -4,8 +4,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	_ "github.com/aleksandr/strive-api/docs"
+	"github.com/aleksandr/strive-api/internal/clients"
 	"github.com/aleksandr/strive-api/internal/config"
 	"github.com/aleksandr/strive-api/internal/database"
 	httphandler "github.com/aleksandr/strive-api/internal/http"
@@ -101,41 +103,60 @@ func runMigrations(cfg *config.Config, logger *logger.Logger) {
 }
 
 type Services struct {
-	Auth    services.AuthService
-	User    services.UserService
-	Calorie services.CalorieService
+	Auth     services.AuthService
+	User     services.UserService
+	Calorie  services.CalorieService
+	Exercise services.ExerciseService
 }
 
 func setupServices(db *database.Database, cfg *config.Config) *Services {
 	userRepo := repositories.NewUserRepository(db.Pool())
 	refreshTokenRepo := repositories.NewRefreshTokenRepository(db.Pool())
 	calorieRepo := repositories.NewCalorieRepository(db.Pool())
+	exerciseRepo := repositories.NewExerciseRepository(db.Pool())
 
 	authService := services.NewAuthService(userRepo, refreshTokenRepo, &cfg.JWT)
 	userService := services.NewUserService(userRepo)
 	calorieService := services.NewCalorieService(calorieRepo)
 
+	var exerciseService services.ExerciseService
+	if cfg.ExerciseDB.Enabled {
+		exerciseDBClient := clients.NewExerciseDBClient(&cfg.ExerciseDB, logger.New(cfg.Log.Level, cfg.Log.Format))
+		cacheService := services.NewExerciseCacheService(exerciseRepo, exerciseDBClient, logger.New(cfg.Log.Level, cfg.Log.Format), 24*time.Hour)
+		exerciseService = services.NewExerciseService(exerciseRepo, cacheService, logger.New(cfg.Log.Level, cfg.Log.Format))
+	} else {
+		exerciseService = nil
+	}
+
 	return &Services{
-		Auth:    authService,
-		User:    userService,
-		Calorie: calorieService,
+		Auth:     authService,
+		User:     userService,
+		Calorie:  calorieService,
+		Exercise: exerciseService,
 	}
 }
 
 type Handlers struct {
-	Auth    *httphandler.AuthHandlers
-	User    *httphandler.UserHandlers
-	Calorie *httphandler.CalorieHandlers
-	Health  *httphandler.DetailedHealthHandler
+	Auth     *httphandler.AuthHandlers
+	User     *httphandler.UserHandlers
+	Calorie  *httphandler.CalorieHandlers
+	Exercise *httphandler.ExerciseHandlers
+	Health   *httphandler.DetailedHealthHandler
 }
 
 func setupHandlers(services *Services, logger *logger.Logger, db *database.Database, cfg *config.Config) *Handlers {
-	return &Handlers{
+	handlers := &Handlers{
 		Auth:    httphandler.NewAuthHandlers(services.Auth, logger, cfg),
 		User:    httphandler.NewUserHandlers(services.User, logger),
 		Calorie: httphandler.NewCalorieHandlers(services.Calorie, logger),
 		Health:  httphandler.NewDetailedHealthHandler(logger, db.Pool()),
 	}
+
+	if services.Exercise != nil {
+		handlers.Exercise = httphandler.NewExerciseHandlers(services.Exercise, logger)
+	}
+
+	return handlers
 }
 
 func setupRoutes(handlers *Handlers, logger *logger.Logger, authService services.AuthService, cfg *config.Config) http.Handler {
@@ -181,6 +202,19 @@ func setupProtectedRoutes(mux *http.ServeMux, authService services.AuthService, 
 	calorieProtectedMux.HandleFunc("/last", handlers.Calorie.GetLastCalculation)
 	calorieProtectedHandler := httphandler.AuthMiddleware(authService, logger)(calorieProtectedMux)
 	mux.Handle("/api/v1/calorie/", http.StripPrefix("/api/v1/calorie", calorieProtectedHandler))
+
+	// Exercise protected routes
+	if handlers.Exercise != nil {
+		exerciseProtectedMux := http.NewServeMux()
+		exerciseProtectedMux.HandleFunc("", handlers.Exercise.GetExercises)
+		exerciseProtectedMux.HandleFunc("/", handlers.Exercise.GetExerciseByID)
+		exerciseProtectedMux.HandleFunc("/muscle-groups", handlers.Exercise.GetMuscleGroups)
+		exerciseProtectedMux.HandleFunc("/equipment", handlers.Exercise.GetEquipment)
+		exerciseProtectedMux.HandleFunc("/cache/status", handlers.Exercise.GetCacheStatus)
+		exerciseProtectedMux.HandleFunc("/cache/refresh", handlers.Exercise.RefreshCache)
+		exerciseProtectedHandler := httphandler.AuthMiddleware(authService, logger)(exerciseProtectedMux)
+		mux.Handle("/api/v1/exercises", http.StripPrefix("/api/v1/exercises", exerciseProtectedHandler))
+	}
 }
 
 func applyMiddleware(mux *http.ServeMux, logger *logger.Logger, cfg *config.Config) http.Handler {
