@@ -15,18 +15,18 @@ services:
       - DB_PASSWORD=password
       - DB_NAME=strive
       - DB_SSL_MODE=disable
-      - JWT_SECRET=production-secret-key-very-long-and-secure
+      - JWT_SECRET=dev-secret-key-12345-very-long-for-security
       - JWT_ISSUER=strive-api
       - JWT_AUDIENCE=strive-app
       - JWT_CLOCK_SKEW=2m
-      - CORS_ALLOWED_ORIGINS=https://your-production-frontend.com
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:4200,https://your-dev-domain.com
       - CORS_ALLOWED_METHODS=GET,POST,PUT,DELETE,OPTIONS
       - CORS_ALLOWED_HEADERS=Accept,Authorization,Content-Type,X-Request-ID
       - CORS_EXPOSED_HEADERS=X-Request-ID
       - CORS_ALLOW_CREDENTIALS=true
       - CORS_MAX_AGE=86400
-      - COOKIE_SECURE=true
-      - COOKIE_SAMESITE=Strict
+      - COOKIE_SECURE=false
+      - COOKIE_SAMESITE=Lax
       - COOKIE_DOMAIN=
       - RATE_LIMIT_ENABLED=true
       - RATE_LIMIT_AUTH_PER_MINUTE=5
@@ -36,12 +36,6 @@ services:
       - EXERCISEDB_BASE_URL=https://exercise.hellogym.io
       - EXERCISEDB_TIMEOUT=30s
       - EXERCISEDB_RETRY_COUNT=3
-      - SECURITY_HSTS_MAX_AGE=31536000
-      - SECURITY_HSTS_INCLUDE_SUBDOMAINS=true
-      - SECURITY_X_FRAME_OPTIONS=DENY
-      - SECURITY_X_CONTENT_TYPE_OPTIONS=nosniff
-      - SECURITY_REFERRER_POLICY=strict-origin-when-cross-origin
-      - SECURITY_XSS_PROTECTION=1; mode=block
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,7 +48,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: strive-postgres
+    container_name: strive-postgres-dev
     environment:
       POSTGRES_DB: strive
       POSTGRES_USER: postgres
@@ -62,7 +56,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d strive"]
@@ -71,4 +65,4 @@ services:
       retries: 5
 
 volumes:
-  postgres_data:
+  postgres_data_dev:
