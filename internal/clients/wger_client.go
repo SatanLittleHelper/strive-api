@@ -35,25 +35,46 @@ func NewWgerClient(cfg *config.WgerConfig, logger *logger.Logger) *WgerClient {
 
 func (c *WgerClient) GetAllExercises(ctx context.Context) ([]models.WgerExercise, error) {
 	var allExercises []models.WgerExercise
-	url := fmt.Sprintf("%s/exerciseinfo/?limit=100", c.baseURL)
+	url := fmt.Sprintf("%s/exerciseinfo/?limit=20", c.baseURL)
+	page := 1
+
+	c.logger.Info("Starting to fetch all exercises with pagination", "base_url", url)
 
 	for url != "" {
+		c.logger.Info("Fetching exercises page", "page", page, "url", url)
+
 		var response models.WgerExerciseListResponse
 		err := c.makeRequest(ctx, url, &response)
 		if err != nil {
+			c.logger.Error("Failed to fetch exercises page", "page", page, "error", err)
 			return nil, err
 		}
 
 		allExercises = append(allExercises, response.Results...)
+		c.logger.Info("Successfully fetched exercises page", "page", page, "count", len(response.Results), "total_so_far", len(allExercises))
 
 		if response.Next != nil {
 			url = *response.Next
+			page++
+			time.Sleep(500 * time.Millisecond)
 		} else {
 			url = ""
 		}
 	}
 
+	c.logger.Info("Successfully fetched all exercises", "total_count", len(allExercises), "total_pages", page)
 	return allExercises, nil
+}
+
+func (c *WgerClient) GetExercisesLimited(ctx context.Context, limit int) ([]models.WgerExercise, error) {
+	url := fmt.Sprintf("%s/exerciseinfo/?limit=%d", c.baseURL, limit)
+	var response models.WgerExerciseListResponse
+	err := c.makeRequest(ctx, url, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Results, nil
 }
 
 func (c *WgerClient) GetExerciseByID(ctx context.Context, id int) (*models.WgerExercise, error) {
@@ -210,13 +231,17 @@ func (c *WgerClient) makeRequest(ctx context.Context, url string, result interfa
 	for attempt := 0; attempt <= c.retryCount; attempt++ {
 		if attempt > 0 {
 			backoff := time.Duration(attempt) * time.Second
-			c.logger.Debug("Retrying request", "attempt", attempt, "backoff", backoff, "url", url)
+			c.logger.Info("Retrying request", "attempt", attempt, "backoff", backoff, "url", url)
 			time.Sleep(backoff)
 		}
+
+		startTime := time.Now()
+		c.logger.Info("Starting request to wger API", "url", url, "attempt", attempt+1, "timeout", c.httpClient.Timeout)
 
 		req, err := http.NewRequestWithContext(ctx, "GET", url, http.NoBody)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to create request: %w", err)
+			c.logger.Error("Failed to create request", "error", err, "url", url)
 			continue
 		}
 
@@ -226,16 +251,22 @@ func (c *WgerClient) makeRequest(ctx context.Context, url string, result interfa
 			req.Header.Set("Authorization", fmt.Sprintf("Token %s", c.apiKey))
 		}
 
-		c.logger.Debug("Making request to wger API", "url", url, "attempt", attempt+1)
+		c.logger.Info("Making HTTP request", "url", url, "attempt", attempt+1, "headers", req.Header)
 
 		resp, err := c.httpClient.Do(req)
+		requestDuration := time.Since(startTime)
+
 		if err != nil {
 			lastErr = fmt.Errorf("failed to make request: %w", err)
-			c.logger.Warn("Request failed, will retry", "error", err, "url", url, "attempt", attempt+1)
+			c.logger.Warn("Request failed, will retry", "error", err, "url", url, "attempt", attempt+1, "duration", requestDuration)
 			continue
 		}
 
+		c.logger.Info("Received response", "status", resp.StatusCode, "url", url, "duration", requestDuration)
+
 		if resp.StatusCode == http.StatusOK {
+			c.logger.Info("Reading response body", "url", url, "content_length", resp.ContentLength)
+
 			body, err := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
@@ -245,13 +276,20 @@ func (c *WgerClient) makeRequest(ctx context.Context, url string, result interfa
 				continue
 			}
 
+			previewSize := 200
+			if len(body) < previewSize {
+				previewSize = len(body)
+			}
+			c.logger.Info("Successfully read response body", "url", url, "body_size", len(body), "body_preview", string(body[:previewSize]))
+
 			if err := json.Unmarshal(body, &result); err != nil {
 				lastErr = fmt.Errorf("failed to unmarshal response: %w", err)
-				c.logger.Warn("Failed to unmarshal response, will retry", "error", err, "url", url, "attempt", attempt+1)
+				c.logger.Warn("Failed to unmarshal response, will retry",
+					"error", err, "url", url, "attempt", attempt+1, "body_preview", string(body[:previewSize]))
 				continue
 			}
 
-			c.logger.Debug("Successfully received response from wger API", "url", url, "attempt", attempt+1)
+			c.logger.Info("Successfully parsed response from wger API", "url", url, "attempt", attempt+1)
 			return nil
 		}
 

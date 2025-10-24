@@ -61,24 +61,24 @@ func TestWgerClient_GetAllExercises(t *testing.T) {
 			UUID:        "test-uuid-1",
 			Name:        "Bench Press",
 			Description: "A chest exercise",
-			Category:    1,
-			Muscles:     []int{1, 2},
-			Equipment:   []int{1},
+			Category:    models.WgerCategory{ID: 1, Name: "Chest"},
+			Muscles:     []models.WgerMuscle{{ID: 1, Name: "Pectorals"}, {ID: 2, Name: "Triceps"}},
+			Equipment:   []models.WgerEquipment{{ID: 1, Name: "Barbell"}},
 		},
 		{
 			ID:          2,
 			UUID:        "test-uuid-2",
 			Name:        "Squat",
 			Description: "A leg exercise",
-			Category:    2,
-			Muscles:     []int{3, 4},
-			Equipment:   []int{2},
+			Category:    models.WgerCategory{ID: 2, Name: "Legs"},
+			Muscles:     []models.WgerMuscle{{ID: 3, Name: "Quadriceps"}, {ID: 4, Name: "Glutes"}},
+			Equipment:   []models.WgerEquipment{{ID: 2, Name: "Barbell"}},
 		},
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/exerciseinfo/", r.URL.Path)
-		assert.Contains(t, r.URL.RawQuery, "limit=100")
+		assert.Contains(t, r.URL.RawQuery, "limit=20")
 
 		response := models.WgerExerciseListResponse{
 			Count:    2,
@@ -109,9 +109,9 @@ func TestWgerClient_GetExerciseByID(t *testing.T) {
 		UUID:        "test-uuid",
 		Name:        "Bench Press",
 		Description: "A chest exercise",
-		Category:    1,
-		Muscles:     []int{1, 2},
-		Equipment:   []int{1},
+		Category:    models.WgerCategory{ID: 1, Name: "Chest"},
+		Muscles:     []models.WgerMuscle{{ID: 1, Name: "Pectorals"}, {ID: 2, Name: "Triceps"}},
+		Equipment:   []models.WgerEquipment{{ID: 1, Name: "Barbell"}},
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

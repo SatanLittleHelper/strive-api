@@ -122,7 +122,7 @@ func setupServices(db *database.Database, cfg *config.Config) *Services {
 	var exerciseService services.ExerciseService
 	if cfg.Wger.Enabled {
 		wgerClient := clients.NewWgerClient(&cfg.Wger, logger.New(cfg.Log.Level, cfg.Log.Format))
-		cacheService := services.NewExerciseCacheService(exerciseRepo, wgerClient, logger.New(cfg.Log.Level, cfg.Log.Format), 24*time.Hour)
+		cacheService := services.NewExerciseCacheService(exerciseRepo, wgerClient, logger.New(cfg.Log.Level, cfg.Log.Format), 1*time.Minute)
 		exerciseService = services.NewExerciseService(exerciseRepo, cacheService, logger.New(cfg.Log.Level, cfg.Log.Format))
 	} else {
 		exerciseService = nil
