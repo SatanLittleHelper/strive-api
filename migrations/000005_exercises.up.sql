@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS muscle_groups (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    wger_id INTEGER NOT NULL UNIQUE,
+    wger_id INTEGER NOT NULL,
     name VARCHAR(100) NOT NULL,
     name_en VARCHAR(100) NOT NULL DEFAULT '',
     is_front BOOLEAN NOT NULL DEFAULT true,
@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS muscle_groups (
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'muscle_groups' AND column_name = 'exercise_db_id') THEN
+        ALTER TABLE muscle_groups DROP CONSTRAINT IF EXISTS muscle_groups_exercise_db_id_key;
         ALTER TABLE muscle_groups RENAME COLUMN exercise_db_id TO wger_id;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'muscle_groups' AND column_name = 'name_en') THEN
@@ -19,11 +20,14 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'muscle_groups' AND column_name = 'is_front') THEN
         ALTER TABLE muscle_groups ADD COLUMN is_front BOOLEAN NOT NULL DEFAULT true;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name = 'muscle_groups' AND constraint_name = 'muscle_groups_wger_id_key') THEN
+        ALTER TABLE muscle_groups ADD CONSTRAINT muscle_groups_wger_id_key UNIQUE (wger_id);
+    END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS equipment (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    wger_id INTEGER NOT NULL UNIQUE,
+    wger_id INTEGER NOT NULL,
     name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -32,13 +36,17 @@ CREATE TABLE IF NOT EXISTS equipment (
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'equipment' AND column_name = 'exercise_db_id') THEN
+        ALTER TABLE equipment DROP CONSTRAINT IF EXISTS equipment_exercise_db_id_key;
         ALTER TABLE equipment RENAME COLUMN exercise_db_id TO wger_id;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name = 'equipment' AND constraint_name = 'equipment_wger_id_key') THEN
+        ALTER TABLE equipment ADD CONSTRAINT equipment_wger_id_key UNIQUE (wger_id);
     END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS exercises (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    wger_id INTEGER NOT NULL UNIQUE,
+    wger_id INTEGER NOT NULL,
     wger_uuid VARCHAR(255) NOT NULL DEFAULT '',
     name VARCHAR(255) NOT NULL,
     description TEXT NOT NULL DEFAULT '',
@@ -48,7 +56,7 @@ CREATE TABLE IF NOT EXISTS exercises (
     license_author VARCHAR(255) NOT NULL DEFAULT '',
     creation_date DATE,
     cached_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW() + INTERVAL '1 day',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -56,6 +64,7 @@ CREATE TABLE IF NOT EXISTS exercises (
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'exercises' AND column_name = 'exercise_db_id') THEN
+        ALTER TABLE exercises DROP CONSTRAINT IF EXISTS exercises_exercise_db_id_key;
         ALTER TABLE exercises RENAME COLUMN exercise_db_id TO wger_id;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'exercises' AND column_name = 'wger_uuid') THEN
@@ -76,15 +85,8 @@ BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'exercises' AND column_name = 'uuid') THEN
         ALTER TABLE exercises DROP COLUMN uuid;
     END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'exercises' AND column_name = 'description') THEN
-        ALTER TABLE exercises ALTER COLUMN description TYPE TEXT;
-        ALTER TABLE exercises ALTER COLUMN description SET NOT NULL;
-        ALTER TABLE exercises ALTER COLUMN description SET DEFAULT '';
-    END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'exercises' AND column_name = 'license_author') THEN
-        ALTER TABLE exercises ALTER COLUMN license_author TYPE VARCHAR(255);
-        ALTER TABLE exercises ALTER COLUMN license_author SET NOT NULL;
-        ALTER TABLE exercises ALTER COLUMN license_author SET DEFAULT '';
+    IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE table_name = 'exercises' AND constraint_name = 'exercises_wger_id_key') THEN
+        ALTER TABLE exercises ADD CONSTRAINT exercises_wger_id_key UNIQUE (wger_id);
     END IF;
 END $$;
 
@@ -106,18 +108,21 @@ CREATE TABLE IF NOT EXISTS exercise_equipment (
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exercise_alternatives') THEN
+        DROP TABLE IF EXISTS exercise_variations CASCADE;
         ALTER TABLE exercise_alternatives RENAME TO exercise_variations;
-        ALTER TABLE exercise_variations RENAME COLUMN alternative_exercise_id TO variation_exercise_id;
-    ELSE
-        CREATE TABLE IF NOT EXISTS exercise_variations (
-            exercise_id UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
-            variation_exercise_id UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            PRIMARY KEY (exercise_id, variation_exercise_id),
-            CHECK (exercise_id != variation_exercise_id)
-        );
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'exercise_variations' AND column_name = 'alternative_exercise_id') THEN
+            ALTER TABLE exercise_variations RENAME COLUMN alternative_exercise_id TO variation_exercise_id;
+        END IF;
     END IF;
 END $$;
+
+CREATE TABLE IF NOT EXISTS exercise_variations (
+    exercise_id UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+    variation_exercise_id UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (exercise_id, variation_exercise_id),
+    CHECK (exercise_id != variation_exercise_id)
+);
 
 DROP INDEX IF EXISTS idx_exercises_exercise_db_id;
 DROP INDEX IF EXISTS idx_muscle_groups_exercise_db_id;
