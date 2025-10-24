@@ -60,13 +60,15 @@ services:
         value: 60
       - key: RATE_LIMIT_BURST_SIZE
         value: 10
-      - key: EXERCISEDB_ENABLED
+      - key: WGER_API_ENABLED
         value: "true"
-      - key: EXERCISEDB_BASE_URL
-        value: https://exercise.hellogym.io
-      - key: EXERCISEDB_TIMEOUT
+      - key: WGER_API_BASE_URL
+        value: https://wger.de/api/v2
+      - key: WGER_API_KEY
+        value: ""
+      - key: WGER_API_TIMEOUT
         value: 30s
-      - key: EXERCISEDB_RETRY_COUNT
+      - key: WGER_API_RETRY_COUNT
         value: 3
       - key: SECURITY_HSTS_MAX_AGE
         value: 31536000
