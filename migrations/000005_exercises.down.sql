@@ -1,7 +1,22 @@
-DROP TABLE IF EXISTS exercise_variations;
-DROP TABLE IF EXISTS exercise_equipment;
-DROP TABLE IF EXISTS exercise_muscle_groups;
-DROP TABLE IF EXISTS exercises;
-DROP TABLE IF EXISTS equipment;
-DROP TABLE IF EXISTS muscle_groups;
+DROP INDEX IF EXISTS idx_exercise_variations_variation_id;
+DROP INDEX IF EXISTS idx_exercise_variations_exercise_id;
+DROP INDEX IF EXISTS idx_exercise_equipment_equipment_id;
+DROP INDEX IF EXISTS idx_exercise_equipment_exercise_id;
+DROP INDEX IF EXISTS idx_exercise_muscle_groups_muscle_group_id;
+DROP INDEX IF EXISTS idx_exercise_muscle_groups_exercise_id;
+DROP INDEX IF EXISTS idx_equipment_name;
+DROP INDEX IF EXISTS idx_equipment_wger_id;
+DROP INDEX IF EXISTS idx_muscle_groups_name;
+DROP INDEX IF EXISTS idx_muscle_groups_wger_id;
+DROP INDEX IF EXISTS idx_exercises_expires_at;
+DROP INDEX IF EXISTS idx_exercises_cached_at;
+DROP INDEX IF EXISTS idx_exercises_name;
+DROP INDEX IF EXISTS idx_exercises_category;
+DROP INDEX IF EXISTS idx_exercises_wger_id;
 
+DROP TABLE IF EXISTS exercise_variations CASCADE;
+DROP TABLE IF EXISTS exercise_equipment CASCADE;
+DROP TABLE IF EXISTS exercise_muscle_groups CASCADE;
+DROP TABLE IF EXISTS exercises CASCADE;
+DROP TABLE IF EXISTS equipment CASCADE;
+DROP TABLE IF EXISTS muscle_groups CASCADE;
